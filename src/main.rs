@@ -6,10 +6,10 @@ extern crate log;
 
 extern crate env_logger;
 
-use rand::Rng;
-
+mod client;
 mod rpc_server;
 mod swarms;
+mod test_context;
 
 use std::io::prelude::*;
 use swarms::*;
@@ -33,59 +33,7 @@ fn prepare_testing() {
     std::fs::create_dir(&playground_path).unwrap();
 }
 
-#[allow(dead_code)]
-fn spawn_service_node(
-    path_to_bin: &std::path::Path,
-    sn: &ServiceNode,
-) -> Option<std::process::Child> {
-    let mut server_process = std::process::Command::new(&path_to_bin);
-
-    let path = std::path::Path::new(&sn.ip);
-
-    if !path.exists() {
-        std::fs::create_dir(&path).unwrap();
-    }
-
-    server_process.current_dir(&path);
-
-    {
-        let err_path = path.join("stderr.txt");
-
-        let stderr_file = std::fs::File::create(&err_path).unwrap();
-
-        let stdout_file = stderr_file.try_clone().unwrap();
-
-        server_process.stderr(std::process::Stdio::from(stderr_file));
-        server_process.stdout(std::process::Stdio::from(stdout_file));
-    }
-
-    server_process.arg("0.0.0.0");
-    server_process.arg(sn.ip.to_string());
-
-    match server_process.spawn() {
-        Ok(child) => Some(child),
-        Err(e) => {
-            eprintln!("error spawning process: {}", e);
-            None
-        }
-    }
-}
-
-fn spawn_init_swarms(sm: &SwarmManager, path_to_bin: &std::path::Path) -> Vec<std::process::Child> {
-    let mut snodes = vec![];
-
-    for swarm in sm.swarms.iter() {
-        for sn in &swarm.nodes {
-            if let Some(node) = spawn_service_node(&path_to_bin, &sn) {
-                snodes.push(node);
-            }
-        }
-    }
-
-    snodes
-}
-
-fn test_sn_data(swarm: &Swarm) {
+fn print_sn_data(swarm: &Swarm) {
     for sn in &swarm.nodes {
         println!("[{}]", &sn.ip);
 
@@ -110,41 +58,212 @@ fn test_sn_data(swarm: &Swarm) {
     }
 }
 
-fn send_random_message(sm : &SwarmManager) {
+fn test3(bc: Arc<Mutex<rpc_server::Blockchain>>) {
+    let sm = &mut bc.lock().unwrap().swarm_manager;
 
-    // generate random PK
-    // For now, PK is a random 256 bit string
+    let ctx = test_context::TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
 
-    let mut rng = rand::thread_rng();
+    sm.add_swarm(&["5901", "5904"]);
+    sm.add_swarm(&["5902", "5905"]);
+    sm.add_swarm(&["5903", "5906"]);
 
-    let n1 = rng.gen::<u64>();
-    let n2 = rng.gen::<u64>();
-    let n3 = rng.gen::<u64>();
-    let n4 = rng.gen::<u64>();
+    let bc = Arc::clone(&bc);
+    let ctx = Arc::clone(&ctx);
 
-    let pk = format!("{:x}{:x}{:x}{:x}", n1, n2, n3, n4);
-    println!("pk: {}", pk);
+    std::thread::spawn(move || {
+        // give SNs some time to initialize their servers
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "This is a multi word message. It will move.");
+        ctx.lock().unwrap().send_message("7266a21a81e6c820f803fa3e93e0d4485edced56dc220f4318dc9310a977a0ab", "No_move_(1)");
+
+        // Add another swarm after some short period of time
+        std::thread::sleep(std::time::Duration::from_millis(5000));
+        bc.lock().unwrap().swarm_manager.add_swarm(&["5907", "5908"]);
+
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "No_move_(2)");
+
+        // check that the messages are available
+
+        std::thread::sleep(std::time::Duration::from_millis(3000));
+
+        ctx.lock().unwrap().check_messages();
+
+    });
+}
+
+
+fn test_dissolving(bc: Arc<Mutex<rpc_server::Blockchain>>) {
+
+    let sm = &mut bc.lock().unwrap().swarm_manager;
+
+    let ctx = test_context::TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
+
+    ctx.lock().unwrap().add_snode("5901");
+
+    sm.add_swarm(&["5901"]);
+    sm.add_swarm(&["5902"]);
+    sm.add_swarm(&["5903"]);
+    sm.add_swarm(&["5904"]);
+    sm.add_swarm(&["5905"]);
+
+    let bc = Arc::clone(&bc);
+
+    std::thread::spawn(move || {
+        // give SNs some time to initialize their servers
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A");
+        ctx.lock().unwrap().send_message("1efe23d3a5445abe6f7a74c0601f352699d82a33020defa8c6f72f9cd1d403d3", "B");
+        ctx.lock().unwrap().send_message("18b593e832ffda161c20a5daf842ab787ee7181a369ff7034fe80fb2774e0664", "C");
+        ctx.lock().unwrap().send_message("51fcd662950d931d7a64e21378dd86c1505126612caf173d2ffb761e41f39aca", "D");
+
+        // The messages will go to swarm 3, dissolve it
+        &bc.lock().unwrap().swarm_manager.dissolve_swarm(3);
+
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        // test that swarm 9223372036854775807 has messages A and D,
+        // and that swarm 0 has messages B and C
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+        ctx.lock().unwrap().send_message("1efe23d3a5445abe6f7a74c0601f352699d82a33020defa8c6f72f9cd1d403d3", "B2");
+        ctx.lock().unwrap().send_message("18b593e832ffda161c20a5daf842ab787ee7181a369ff7034fe80fb2774e0664", "C2");
+        ctx.lock().unwrap().send_message("51fcd662950d931d7a64e21378dd86c1505126612caf173d2ffb761e41f39aca", "D2");
+
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+
+        ctx.lock().unwrap().check_messages();
+
+    });
 
 }
 
 
+fn large_test(bc: Arc<Mutex<rpc_server::Blockchain>>) {
+
+    // start with a limited pool of public keys
+    let pks = [
+        "ef57493cd18b632c7d4351f1bc91c23f62f933479e9fd5a976a6f2912edf71a3",
+        "f63ca4260ffae0512e4f9f84435d7d76e41609d1ccf61507d67f9337c36c11a8",
+        "3e96e57bdf99e68de8c88bc20ed4ba32e122194ea957dbc1f9417cdca28fd77",
+        "ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", // this one should belong to swarm 3 after it is added
+        "648763a60ef63e49988a3e3934338745ff45d6b8410181eab58caf92ec97ae27",
+    ];
+
+
+    let sm = &mut bc.lock().unwrap().swarm_manager;
+
+    let ctx = test_context::TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
+
+    sm.add_swarm(&["5901"]);
+    sm.add_swarm(&["5902"]);
+    sm.add_swarm(&["5903"]);
+    sm.add_swarm(&["5904"]);
+    sm.add_swarm(&["5905"]);
+
+    let bc = Arc::clone(&bc);
+
+    // TODO
+
+    std::thread::spawn(move || {
+        // give SNs some time to initialize their servers
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+
+        // Construct an unreasonably large message:
+        let mut large_msg = String::new();
+
+        /// NOTE: Our server fails on this (Error(9): body limit exceeded)
+        for _ in 0..200000 {
+            large_msg.push_str("012345657");
+        }
+
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", &large_msg);
+
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+
+        ctx.lock().unwrap().check_messages();
+
+    });
+
+
+}
+
+fn test_with_wierd_clients(bc: Arc<Mutex<rpc_server::Blockchain>>) {
+
+    let sm = &mut bc.lock().unwrap().swarm_manager;
+
+    let ctx = test_context::TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
+
+    let bc = Arc::clone(&bc);
+
+    sm.add_swarm(&["5901"]);
+
+    std::thread::spawn(move || {
+        // give SNs some time to initialize their servers
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+
+        // Construct an unreasonably large message:
+        let mut large_msg = String::new();
+
+        /// NOTE: Our server fails on this (Error(9): body limit exceeded)
+        for _ in 0..200000 {
+            large_msg.push_str("012345657");
+        }
+
+        ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", &large_msg);
+
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+
+        ctx.lock().unwrap().check_messages();
+
+    });
+
+}
+
+use tokio::prelude::*;
+
+#[allow(dead_code)]
+fn test_tokio() {
+    let fut = tokio::timer::Delay::new(
+        std::time::Instant::now() + std::time::Duration::from_millis(1000),
+    );
+
+    let fut = fut
+        .and_then(|_| {
+            println!("time out!");
+            Ok(())
+        })
+        .map_err(|_e| panic!("timer failed"));
+
+    tokio::run(fut);
+}
+
+fn send_req_to_quit(sn: &ServiceNode) {
+    let target = "/quit";
+    let addr = "http://localhost:".to_owned() + &sn.ip + target;
+
+    let client = reqwest::Client::new();
+
+    if let Err(_) = client.post(&addr).send() {
+        error!("could not send /quit request to a node at {}", &sn.ip);
+    } else {
+        warn!("quitting {}", &sn.ip);
+    }
+}
+
 fn main() {
     env_logger::init();
 
-    let mut swarm_manager = SwarmManager { swarms: vec![] };
-
-    // Add initial swarms
-    swarm_manager.add_swarm(&["5901", "5902", "5903", "5904"]);
-    swarm_manager.add_swarm(&["5905", "5906"]);
-
-    swarm_manager.add_swarm(&["5908"]);
-    swarm_manager.add_swarm(&["5909"]);
-    swarm_manager.add_swarm(&["5910"]);
-
-    return;
-
-    let blockchain = rpc_server::RpcServer::new(swarm_manager);
-
+    let swarm_manager = SwarmManager::new();
+    let blockchain = rpc_server::Blockchain::new(swarm_manager);
     let blockchain = Arc::new(Mutex::new(blockchain));
 
     let bc = Arc::clone(&blockchain);
@@ -154,30 +273,8 @@ fn main() {
         rpc_server::start_http_server(bc);
     });
 
-    let config_copy = &blockchain.lock().unwrap().swarm_manager.clone();
-
-    let server_path =
-        std::path::Path::new("/Users/maxim/Work/loki-storage-server/build/httpserver");
-    let mut snodes = spawn_init_swarms(&config_copy, server_path);
-
-    let bc = Arc::clone(&blockchain);
-    let path_to_bin = server_path.clone();
-
-    // TODO: should use Tokio instead
-    std::thread::spawn(move || {
-        // create another swarm after 5 sec
-        std::thread::sleep(std::time::Duration::from_secs(5));
-
-        warn!("CREATING A NEW SNODE");
-
-        let sn = ServiceNode {
-            ip: "5907".to_owned(),
-        };
-
-        spawn_service_node(&path_to_bin, &sn);
-
-        bc.lock().unwrap().swarm_manager.swarms[0].nodes.push(sn);
-    });
+    // let mut snodes = test(Arc::clone(&blockchain));
+    test_with_wierd_clients(Arc::clone(&blockchain));
 
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
@@ -191,20 +288,31 @@ fn main() {
         }
 
         if command == "test" {
-            let swarm = &blockchain.lock().unwrap().swarm_manager.swarms[0];
-            test_sn_data(swarm);
+            let sm = &blockchain.lock().unwrap().swarm_manager;
+
+            for s in &sm.swarms {
+                println!("          ___swarm {}___", s.swarm_id);
+                print_sn_data(s);
+            }
         }
 
         if command == "send" {
-
             // For now: send a random message to a random PK
-            send_random_message(&blockchain.lock().unwrap().swarm_manager);
+            client::send_random_message(&blockchain.lock().unwrap().swarm_manager);
         }
     }
 
-
     println!("waiting for service nodes to finish");
-    for sn in snodes.iter_mut() {
+
+    let sm = &mut blockchain.lock().unwrap().swarm_manager;
+
+    for sn in sm.swarms.iter() {
+        for node in sn.nodes.iter() {
+            send_req_to_quit(&node);
+        }
+    }
+
+    for sn in sm.children.iter_mut() {
         sn.wait().unwrap();
     }
 

@@ -1,4 +1,4 @@
-pub struct RpcServer {
+pub struct Blockchain {
     pub swarm_manager: SwarmManager,
 }
 
@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::swarms::*;
 
-impl RpcServer {
-    pub fn new(swarm_manager: SwarmManager) -> RpcServer {
-        RpcServer { swarm_manager }
+impl Blockchain {
+    pub fn new(swarm_manager: SwarmManager) -> Blockchain {
+        Blockchain { swarm_manager }
     }
 
     fn process_json_rpc(&mut self, val: serde_json::Value) -> String {
@@ -20,6 +20,8 @@ impl RpcServer {
             match method {
                 "get_service_nodes" => {
                     for swarm in &self.swarm_manager.swarms {
+                        res.push_str(&swarm.swarm_id.to_string());
+                        res.push_str(" ");
                         for sn in &swarm.nodes {
                             res.push_str(&sn.ip);
                             res.push_str(" ");
@@ -43,7 +45,7 @@ impl RpcServer {
     }
 }
 
-pub fn start_http_server(bc: Arc<Mutex<RpcServer>>) {
+pub fn start_http_server(bc: Arc<Mutex<Blockchain>>) {
     let server = simple_server::Server::new(move |req, mut res| {
         let req_body = String::from_utf8_lossy(req.body());
 
