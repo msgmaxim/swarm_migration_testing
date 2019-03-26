@@ -5,10 +5,30 @@ pub struct Blockchain {
 use std::sync::{Arc, Mutex};
 
 use crate::swarms::*;
+use std::fmt::{self, Debug, Display};
+
+impl Display for Blockchain {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
+
+        for swarm in &self.swarm_manager.swarms {
+            if let Err(e) = write!(f, "[{}] ", swarm.nodes.len()) {
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+}
 
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
         Blockchain { swarm_manager }
+    }
+
+    pub fn reset(&mut self) {
+        self.swarm_manager.reset();
     }
 
     fn process_json_rpc(&mut self, val: serde_json::Value) -> String {

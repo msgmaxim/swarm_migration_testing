@@ -1,25 +1,40 @@
-use rand::RngCore;
+use rand::prelude::*;
+use rand::seq::SliceRandom;
+use std::fmt::{self, Debug};
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone, PartialEq)]
 pub struct ServiceNode {
     pub ip: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Swarm {
     pub swarm_id: u64,
     pub nodes: Vec<ServiceNode>,
 }
 
+pub struct Stats {
+    pub dissolved: u64
+}
+
 pub struct SwarmManager {
     pub swarms: Vec<Swarm>,
     pub children: Vec<std::process::Child>,
+    pub stats : Stats,
+    rng : StdRng,
 }
 
 // pub type PubKey = [u64; 4];
-
 pub struct PubKey {
     data: [u64; 4],
+}
+
+impl Debug for PubKey {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PubKey: <{}>", self.to_string())
+    }
+
 }
 
 const MIN_SWARM_SIZE : usize = 3;
@@ -40,9 +55,7 @@ impl PubKey {
         })
     }
 
-    pub fn gen_random() -> PubKey {
-
-        let mut rng = rand::thread_rng();
+    pub fn gen_random(rng: &mut StdRng) -> PubKey {
 
         let mut pk = [rng.next_u64(), rng.next_u64(), rng.next_u64(), rng.next_u64()];
 
@@ -52,7 +65,7 @@ impl PubKey {
 
     pub fn to_string(&self) -> String {
 
-        format!("{:x}{:x}{:x}{:x}", self.data[0], self.data[1], self.data[2], self.data[3])
+        format!("{:016x}{:016x}{:016x}{:016x}", self.data[0], self.data[1], self.data[2], self.data[3])
     }
 }
 
@@ -61,7 +74,14 @@ static SERVER_PATH: &'static str = "/Users/maxim/Work/loki-storage-server/build/
 pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     let mut server_process = std::process::Command::new(&SERVER_PATH);
 
-    let path = std::path::Path::new(&sn.ip);
+    let path = std::path::Path::new("playground");
+    if !path.exists() {
+        std::fs::create_dir(&path).unwrap();
+    }
+
+    let path = path.join(&sn.ip);
+
+    let path = std::path::Path::new(&path);
 
     if !path.exists() {
         std::fs::create_dir(&path).unwrap();
@@ -97,10 +117,27 @@ impl SwarmManager {
         SwarmManager {
             swarms: vec![],
             children: vec![],
+            stats: Stats { dissolved: 0 },
+            rng : StdRng::seed_from_u64(1)
         }
     }
 
-    pub fn add_swarm<'a>(&mut self, nodes: &[&'a str]) {
+    pub fn reset(&mut self) {
+
+        for swarm in &self.swarms {
+            for sn in &swarm.nodes {
+                crate::send_req_to_quit(&sn);
+            }
+        }
+
+        self.swarms.clear();
+        self.children.clear();
+        self.stats.dissolved = 0;
+        self.rng = StdRng::seed_from_u64(1);
+
+    }
+
+    pub fn add_swarm<'a>(&mut self, nodes: &[u16]) {
         let swarm_id = self.get_next_swarm_id();
 
         warn!("using {} as swarm id", swarm_id);
@@ -128,18 +165,26 @@ impl SwarmManager {
 
         warn!("dissolving swarm: {}", self.swarms[idx].swarm_id);
 
-        let mut swarm = self.swarms.remove(idx);
+        if self.swarms.len() == 1 {
+            error!("Would dissolve the last swarm. Keeping it alive instead.");
+            return;
+        }
 
-        // TODO: randomise this
-        self.swarms[3].nodes.append(&mut swarm.nodes);
+        self.stats.dissolved += 1;
+
+        let swarm = self.swarms.remove(idx);
+
+        for node in swarm.nodes {
+            let target = self.swarms.choose_mut(&mut self.rng).unwrap();
+            target.nodes.push(node);
+        }
+
     }
 
     /// get index into swarms by client's public key
     pub fn get_swarm_by_pk(&self, pk: &PubKey) -> usize {
         let pk = pk.data;
         let res = pk[0] ^ pk[1] ^ pk[2] ^ pk[3];
-
-        println!("res: {}", &res);
 
         let (mut min_idx, mut min_dist) = (0, std::u64::MAX);
 
@@ -159,7 +204,7 @@ impl SwarmManager {
         // but only if we are on the right side of the first swarm id (so we don't overflow)
         if res > self.swarms[0].swarm_id {
 
-            let odd_dist = (std::u64::MAX - res + self.swarms[0].swarm_id);
+            let odd_dist = std::u64::MAX - res + self.swarms[0].swarm_id;
 
             if odd_dist < min_dist {
                 return 0;
@@ -195,10 +240,121 @@ impl SwarmManager {
         return next_id;
     }
 
+
+    /// This does not modify swarm structure leaving the
+    /// disconnected snode in the list.
+    pub fn disconnect_snode(&mut self) -> ServiceNode {
+
+        let mut swarm = &self.swarms.choose(&mut self.rng).unwrap();
+
+        let snode = swarm.nodes.choose(&mut self.rng).unwrap();
+
+        crate::send_req_to_quit(snode);
+
+        warn!("disconnected snode: {}", snode.ip);
+
+        snode.clone()
+    }
+
+    /// Drop one random snode
+    pub fn drop_snode(&mut self) {
+
+        let swarm_idx = self.rng.gen_range(0, self.swarms.len());
+        let swarm = &mut self.swarms[swarm_idx];
+
+        let node_idx = self.rng.gen_range(0, swarm.nodes.len());
+        let node = swarm.nodes.remove(node_idx);
+
+        warn!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
+
+        crate::send_req_to_quit(&node);
+
+        // ==== Try to steal from existing swarms ====
+        if swarm.nodes.len() >= MIN_SWARM_SIZE {
+            return;
+        }
+
+        let mut big_swarms: Vec<Swarm> = self.swarms.iter().filter(|s| s.nodes.len() > MIN_SWARM_SIZE ).cloned().collect();
+
+        info!("Have {} swarms to steal from", big_swarms.len());
+
+        if big_swarms.len() > 0 {
+            let mut big_swarm = big_swarms.choose_mut(&mut self.rng).unwrap();
+            let node_idx = self.rng.gen_range(0, big_swarm.nodes.len());
+            let mov_node = big_swarm.nodes.remove(node_idx);
+
+            for swarm in &mut self.swarms {
+                let mut del_idx : Option<usize> = None;
+                if swarm.swarm_id != big_swarm.swarm_id {
+                    continue;
+                }
+
+                for (idx, node) in &mut swarm.nodes.iter().enumerate() {
+                    if node.ip == mov_node.ip {
+                        del_idx = Some(idx);
+                        break;
+                    }
+                }
+
+                if let Some(del_idx) = del_idx {
+                    assert_eq!(swarm.nodes[del_idx].ip, mov_node.ip);
+                    swarm.nodes.remove(del_idx);
+
+                    break;
+                }
+            }
+
+            let swarm = &mut self.swarms[swarm_idx];
+            warn!("moved snode {} from swarm {} to {}", &node.ip, &big_swarm.swarm_id, &swarm.swarm_id);
+            swarm.nodes.push(mov_node);
+        } else {
+            // dissolve the swarm
+            self.dissolve_swarm(swarm_idx);
+        }
+    }
+
     pub fn add_snode(&mut self, sn : &str) {
 
+        let sn = ServiceNode { ip: sn.to_owned() };
 
-        
+        warn!("NEW SNODE: {}", &sn.ip);
+        let child = spawn_service_node(&sn).expect("error spawning a service node");
+        self.children.push(child);
+
+        // Figure out which swarm this node is to join
+        let mut rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
+
+        info!("choosing swarm: {}", rand_swarm.swarm_id);
+
+        rand_swarm.nodes.push(sn);
+
+        // See if we need to make a new swarm
+        let total_extra = self.swarms.iter().fold(0, |sum, x| if x.nodes.len() > MIN_SWARM_SIZE { sum + x.nodes.len() - MIN_SWARM_SIZE} else { sum } );
+
+        info!("total extra: {}", total_extra);
+
+        if total_extra > MIN_SWARM_SIZE {
+            // create new swarm
+
+            let mut nodes_to_move = vec![];
+
+            while nodes_to_move.len() < 3 {
+
+                let rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
+                if rand_swarm.nodes.len() <= MIN_SWARM_SIZE { continue; }
+                let idx = self.rng.gen_range(0, rand_swarm.nodes.len());
+
+                let node = rand_swarm.nodes.remove(idx);
+                nodes_to_move.push(node);
+            }
+
+
+            let swarm_id = self.get_next_swarm_id();
+            let swarm = Swarm { swarm_id, nodes : nodes_to_move };
+            self.swarms.push(swarm);
+            warn!("using {} as swarm id", swarm_id);
+
+        }
 
     }
 
