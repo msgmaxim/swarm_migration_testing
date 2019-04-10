@@ -9,9 +9,162 @@ use rand::seq::SliceRandom;
 use rand::prelude::*;
 use std::fmt::{self, Debug};
 
+
+pub fn one_node_big_data(bc: Arc<Mutex<Blockchain>>) {
+
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+    ctx.add_swarm(1);
+
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // spawn N threads and bombard with messages
+
+    let mut msg_threads = vec![];
+
+    // make a copy here assuming that swarms are not going to change
+    let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0].ip.clone();
+
+    // I have to manually count the messages as currently I can only use ctx locking
+    // in every message (which defeats the purpose of this test)
+    let mut failed_total = Arc::new(Mutex::new(0));
+    let mut saved_total = Arc::new(Mutex::new(0));
+
+    for i in 0..50 {
+
+        let ip = ip.clone();
+
+        let failed_total = failed_total.clone();
+        let saved_total = saved_total.clone();
+
+        let t = std::thread::spawn(move || {
+
+            let mut rng = StdRng::seed_from_u64(i);
+
+            let pk = PubKey::gen_random(&mut rng).to_string();
+
+            let mut failed = 0;
+            let mut saved = 0;
+
+            for _ in 0..1000 {
+                if crate::client::send_message(&ip, &pk, &crate::client::make_random_message(&mut rng)).is_ok() {
+                    saved += 1;
+                } else {
+                    failed += 1;
+                }
+            }
+
+            *failed_total.lock().unwrap() += failed;
+            *saved_total.lock().unwrap() += saved;
+
+        });
+
+        msg_threads.push(t);
+    }
+
+    for t in msg_threads.into_iter() {
+        t.join().unwrap();
+    }
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    println!("saved total: {}", saved_total.lock().unwrap());
+    println!("failed total: {}", failed_total.lock().unwrap());
+
+
+}
+
+
+pub fn long_polling(bc: Arc<Mutex<Blockchain>>) {
+
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+    let mut ctx = Arc::new(Mutex::new(ctx));
+
+    ctx.lock().unwrap().add_swarm(1);
+
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // have a "client" running in parallel first performing short polling;
+
+    let pk = PubKey::gen_random(&mut rng);
+
+    let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0].ip.clone();
+    crate::client::send_message(&ip, &pk.to_string(), "マンゴー");
+
+    let ctx_clone = Arc::clone(&ctx);
+    let pk_clone = pk.clone();
+
+    std::thread::spawn(move || {
+
+        // check messages every 100 ms
+        let mut last_hash = String::new();
+
+        for _ in 0..30 {
+            std::thread::sleep_ms(100);
+            let msgs = ctx_clone.lock().unwrap().get_new_messages(&pk_clone, &last_hash);
+            dbg!(&msgs);
+
+            if !msgs.is_empty() {
+                last_hash = msgs.last().unwrap().hash.clone();
+            }
+        }
+
+    });
+
+    // send another message in 2s
+    std::thread::sleep_ms(2000);
+    crate::client::send_message(&ip, &pk.to_string(), "второе сообщение");
+
+}
+
+
+pub fn test_bootstrapping_peer_big_data(bc: Arc<Mutex<Blockchain>>) {
+
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+
+    ctx.add_swarm(1);
+
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    for _ in 0..10000 {
+        ctx.send_random_message();
+    }
+
+    ctx.add_snode();
+
+    std::thread::sleep(std::time::Duration::from_millis(10000));
+    ctx.check_messages();
+
+}
+
+pub fn test_bootstrapping_swarm_big_data(bc: Arc<Mutex<Blockchain>>) {
+
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+
+    ctx.add_swarm(1);
+    
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // TODO: send messages concurrently (asynchronously?)
+
+    for _ in 0..10000 {
+        ctx.send_random_message();
+    }
+
+    ctx.add_swarm(1);
+
+    std::thread::sleep(std::time::Duration::from_millis(10000));
+    ctx.check_messages();
+
+}
+
 /// 0. Most basic test: send a message to a single snode and check
 pub fn single_node_one_message(bc: Arc<Mutex<Blockchain>>) {
-
     let ctx = TestContext::new(Arc::clone(&bc));
     let ctx = Arc::new(Mutex::new(ctx));
 
@@ -19,7 +172,7 @@ pub fn single_node_one_message(bc: Arc<Mutex<Blockchain>>) {
 
     std::thread::sleep(std::time::Duration::from_millis(300));
 
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "マンゴー");
 
     std::thread::sleep(std::time::Duration::from_millis(2000));
 
@@ -180,14 +333,39 @@ pub fn test_blocks(bc : Arc<Mutex<Blockchain>>) {
         pks.push(pk);
     }
 
+    let pks = pks; // remove mut
+
     let ctx = TestContext::new(Arc::clone(&bc));
     let ctx = Arc::new(Mutex::new(ctx));
 
     ctx.lock().unwrap().add_swarm(3);
 
-    // Every iteration in this loop corresponds to a block
-    for i in 0..100 {
+    let running = Arc::new(Mutex::new(true));
 
+    let ctx_clone = ctx.clone();
+    let mut rng_clone = rng.clone();
+    let running_clone = running.clone();
+    // Spawn a thread for messages
+    let message_thread = std::thread::spawn(move || {
+
+        for _ in 0..1000 {
+            // give SNs some time to initialize their servers
+            std::thread::sleep(std::time::Duration::from_millis(50));
+
+            let pk = pks.choose(&mut rng_clone).unwrap();
+
+            ctx_clone.lock().unwrap().send_random_message_to_pk(&pk.to_string());
+        };
+
+        *running_clone.lock().unwrap() = false;
+
+    });
+
+    // Every iteration in this loop corresponds to a block
+    for i in 0.. {
+
+        println!("iteration: {}", i);
+        warn!("iteration: {}", i);
         // how much to wait until the next block
         let ms = rng.gen_range(500, 2000);
         std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -208,13 +386,18 @@ pub fn test_blocks(bc : Arc<Mutex<Blockchain>>) {
             }
         }
 
-        println!("iteration: {}", i);
-        println!("swarms: {}", ctx.lock().unwrap());
+        println!("swarms: {:?}", *ctx.lock().unwrap());
+
+        if !*running.lock().unwrap() { break; }
 
     }
 
-    ctx.lock().unwrap().print_stats();
+    message_thread.join().unwrap();
 
+    std::thread::sleep(std::time::Duration::from_millis(2000));
+
+    ctx.lock().unwrap().print_stats();
+    ctx.lock().unwrap().check_messages();
 
 }
 

@@ -5,6 +5,7 @@ use std::io::prelude::*;
 
 use hyper::rt::{self, Future};
 use hyper::{Body};
+use std::time::SystemTime;
 
 #[allow(non_snake_case)]
 #[derive(Serialize)]
@@ -38,6 +39,7 @@ struct RetrieveBody {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MessageResponse {
     pub data: String,
+    pub hash: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -56,6 +58,12 @@ struct RetrieveResponse {
     messages: Vec<MessageResponse>,
 }
 
+pub fn make_random_message(rng : &mut StdRng) -> String {
+
+    let num = rng.gen::<u64>();
+    num.to_string() + &num.to_string() + &num.to_string()
+}
+
 pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
     let target = "/v1/storage_rpc";
     let addr = "http://localhost:".to_owned() + port + target;
@@ -65,13 +73,15 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
     // Prepend the two characters like signal does
     let pk = "05".to_owned() + &pk;
 
+    let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+
     let msg = StoreBody {
         method: "store".to_owned(),
         params: StoreArgs {
             pubKey: pk.clone(),
             ttl: "86400".to_owned(),
             nonce: "324324".to_owned(),
-            timestamp: "1540860811000".to_owned(),
+            timestamp: timestamp.to_string(),
             data: msg.to_owned(),
         },
     };
@@ -80,10 +90,7 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
 
     let req = client
         .post(&addr)
-        .header("X-Loki-recipient", pk.to_owned())
-        .header("X-Loki-ttl", "86400")
         .header("X-Loki-ephemkey", "86400")
-        .header("X-Loki-timestamp", "1540860811000")
         .body(msg);
 
     match req.send() {
@@ -139,6 +146,10 @@ pub fn request_all_messages(sn: &str) -> Vec<MessageResponseFull> {
 }
 
 pub fn request_messages(sn: &ServiceNode, pk: &str) -> Vec<MessageResponse> {
+    request_messages_given_hash(&sn, &pk, "")
+}
+
+pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) -> Vec<MessageResponse> {
 
     let target = "/v1/storage_rpc";
     let addr = "http://localhost:".to_owned() + &sn.ip + target;
@@ -152,7 +163,7 @@ pub fn request_messages(sn: &ServiceNode, pk: &str) -> Vec<MessageResponse> {
         method: "retrieve".to_owned(),
         params: RetrieveArgs {
             pubKey: pk,
-            lastHash: "".to_owned()
+            lastHash: last_hash.to_owned()
         },
     };
 
@@ -219,9 +230,6 @@ pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
 
     let req = client
         .post(&addr)
-        .header("X-Loki-recipient", pk_str.to_owned())
-        .header("X-Loki-ttl", "86400")
-        .header("X-Loki-ephemkey", "86400")
         .header("X-Loki-timestamp", "1540860811000")
         .body(msg);
 
@@ -242,8 +250,8 @@ pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
 
 pub fn send_random_message_to_pk(sm: &SwarmManager, pk_str: &str, rng : &mut StdRng) -> Result<String, ()> {
 
-    let num = rng.gen::<u32>();
-    let msg = num.to_string();
+    let num = rng.gen::<u64>();
+    let msg = num.to_string() + &num.to_string() + &num.to_string();
 
     let res = send_message_to_pk(&sm, &pk_str, &msg);
 
@@ -256,6 +264,8 @@ pub fn send_message_to_pk(sm: &SwarmManager, pk_str: &str, msg: &str) -> Result<
     let swarm_idx = sm.get_swarm_by_pk(&pk);
 
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
+
+    warn!("about to send message");
 
     let res = send_message(&sn.ip, &pk_str, &msg);
 
@@ -302,16 +312,12 @@ pub fn send_random_message(sm: &SwarmManager, mut rng : &mut StdRng) -> Result<(
 
     let pk_str = pk.to_string();
 
-    println!("pk: {}, length: {}", &pk_str, pk_str.len());
-
     let swarm_idx = sm.get_swarm_by_pk(&pk);
 
     let sn = &sm.swarms[swarm_idx as usize].nodes.choose(&mut rng).unwrap();
 
-
-    let num = rng.gen::<u16>();
-
-    let msg = num.to_string();
+    let num = rng.gen::<u64>();
+    let msg = num.to_string() + &num.to_string() + &num.to_string();
 
     let res = send_message(&sn.ip, &pk_str, &msg);
 

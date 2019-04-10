@@ -22,6 +22,43 @@ impl Display for Blockchain {
 
 }
 
+impl Debug for Blockchain {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
+
+        for swarm in &self.swarm_manager.swarms {
+            if let Err(e) = write!(f, "[{:?}] ", swarm) {
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+}
+
+#[derive(Serialize)]
+struct ServiceNodeInfo {
+    swarm_id : u64
+}
+
+#[derive(Serialize)]
+struct ServiceNodeSwarmData {
+    pubkey : String,
+    info : ServiceNodeInfo,
+}
+
+#[derive(Serialize)]
+struct SwarmResult {
+    // Note: lokid rpc currently sends "nested" json, so I have to serialize twice
+    as_json : String
+}
+
+#[derive(Serialize)]
+struct SwarmResponse {
+    result : SwarmResult
+}
+
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
         Blockchain { swarm_manager }
@@ -29,6 +66,21 @@ impl Blockchain {
 
     pub fn reset(&mut self) {
         self.swarm_manager.reset();
+    }
+
+    fn construct_swarm_json(&self) -> String {
+
+        let mut sn_list = vec![];
+
+        for swarm in &self.swarm_manager.swarms {
+            for sn in &swarm.nodes {
+                sn_list.push( ServiceNodeSwarmData{ pubkey : sn.ip.clone(), info : ServiceNodeInfo { swarm_id : swarm.swarm_id } } )
+            }
+        }
+
+        let mut response = SwarmResponse { result : SwarmResult { as_json : serde_json::to_string(&sn_list).expect("could not construct json") } };
+
+        serde_json::to_string(&response).expect("could not construct json")
     }
 
     fn process_json_rpc(&mut self, val: serde_json::Value) -> String {
@@ -39,16 +91,7 @@ impl Blockchain {
 
             match method {
                 "get_service_nodes" => {
-                    for swarm in &self.swarm_manager.swarms {
-                        res.push_str(&swarm.swarm_id.to_string());
-                        res.push_str(" ");
-                        for sn in &swarm.nodes {
-                            res.push_str(&sn.ip);
-                            res.push_str(" ");
-                        }
-
-                        res.push_str("\n");
-                    }
+                    res = self.construct_swarm_json();
                 },
                 "get_swarm_by_pk" => {
                     warn!("TODO: handle get_swarm_by_pk");
@@ -59,7 +102,7 @@ impl Blockchain {
             }
         }
 
-        info!("{:?}", &res);
+        warn!("{}", &res);
 
         res
     }
@@ -84,7 +127,7 @@ pub fn start_http_server(bc: Arc<Mutex<Blockchain>>) {
         Ok(final_res)
     });
 
-    println!("starting RPC server on port 7777...");
+    println!("starting RPC server on port 38157...");
 
-    server.listen("0.0.0.0", "7777");
+    server.listen("0.0.0.0", "38157");
 }

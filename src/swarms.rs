@@ -7,10 +7,22 @@ pub struct ServiceNode {
     pub ip: String,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Swarm {
     pub swarm_id: u64,
     pub nodes: Vec<ServiceNode>,
+}
+
+impl Debug for Swarm {
+
+    fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: ", &self.swarm_id);
+        for sn in &self.nodes {
+            write!(f, "{:?} ", sn.ip);
+        }
+        Ok(())
+    }
+
 }
 
 pub struct Stats {
@@ -25,6 +37,7 @@ pub struct SwarmManager {
 }
 
 // pub type PubKey = [u64; 4];
+#[derive(Clone)]
 pub struct PubKey {
     data: [u64; 4],
 }
@@ -69,7 +82,7 @@ impl PubKey {
     }
 }
 
-static SERVER_PATH: &'static str = "/Users/maxim/Work/loki-storage-server/build/httpserver";
+static SERVER_PATH: &'static str = "/Users/maxim/Work/loki-storage-server/build/httpserver/httpserver";
 
 pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     let mut server_process = std::process::Command::new(&SERVER_PATH);
@@ -102,6 +115,8 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
 
     server_process.arg("0.0.0.0");
     server_process.arg(sn.ip.to_string());
+    server_process.arg("--log-level");
+    server_process.arg("debug");
 
     match server_process.spawn() {
         Ok(child) => Some(child),
@@ -186,7 +201,13 @@ impl SwarmManager {
         let pk = pk.data;
         let res = pk[0] ^ pk[1] ^ pk[2] ^ pk[3];
 
-        let (mut min_idx, mut min_dist) = (0, std::u64::MAX);
+        const MAX_VALUE : u64 = std::u64::MAX - 1;
+
+        let (mut cur_best, mut min_dist) = (0, std::u64::MAX);
+        let mut leftmost = std::u64::MAX;
+        let mut leftmost_idx = 0;
+        let mut rightmost = 0;
+        let mut rightmost_idx = 0;
 
         for (idx, sw) in self.swarms.iter().enumerate() {
             let dist = if sw.swarm_id > res {
@@ -196,22 +217,37 @@ impl SwarmManager {
             };
             if dist < min_dist {
                 min_dist = dist;
-                min_idx = idx;
+                cur_best = idx;
+            }
+
+            if sw.swarm_id < leftmost {
+                leftmost = sw.swarm_id;
+                leftmost_idx = idx;
+            }
+
+            if sw.swarm_id > rightmost {
+                rightmost = sw.swarm_id;
+                rightmost_idx = idx;
             }
         }
 
-        // Note: we wrap 0 and std::u64::MAX, so handle this case separately,
-        // but only if we are on the right side of the first swarm id (so we don't overflow)
-        if res > self.swarms[0].swarm_id {
+        if res > rightmost {
 
-            let odd_dist = std::u64::MAX - res + self.swarms[0].swarm_id;
-
-            if odd_dist < min_dist {
-                return 0;
+            let dist = (MAX_VALUE - res) + leftmost;
+            if dist < min_dist {
+                cur_best = leftmost_idx;
             }
+
+        } else if res < leftmost {
+
+            let dist = res + (MAX_VALUE - rightmost);
+            if dist < min_dist {
+                cur_best = rightmost_idx;
+            }
+
         }
 
-        min_idx
+        cur_best
     }
 
     // This seems to work fine, but I could add some unit tests

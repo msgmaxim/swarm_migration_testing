@@ -2,6 +2,9 @@
 extern crate serde_derive;
 
 #[macro_use]
+extern crate serde_json;
+
+#[macro_use]
 extern crate log;
 
 extern crate env_logger;
@@ -73,12 +76,17 @@ fn main() {
         rpc_server::start_http_server(bc);
     });
 
+    tests::long_polling(Arc::clone(&blockchain));
+    // tests::one_node_big_data(Arc::clone(&blockchain));
+    // tests::test_bootstrapping_peer_big_data(Arc::clone(&blockchain));
+    // tests::test_bootstrapping_swarm_big_data(Arc::clone(&blockchain));
     // tests::single_node_one_message(Arc::clone(&blockchain));
-    // tests::single_node_one_message(Arc::clone(&blockchain));
+    // tests::single_swarm_one_message(Arc::clone(&blockchain));
     // tests::sinlge_swarm_joined(Arc::clone(&blockchain));
+    // tests::test_dissolving(Arc::clone(&blockchain));
     // tests::test_snode_disconnecting(Arc::clone(&blockchain));
     // tests::large_test(Arc::clone(&blockchain));
-    tests::test_blocks(Arc::clone(&blockchain));
+    // tests::test_blocks(Arc::clone(&blockchain));
     // blockchain.lock().unwrap().reset();
 
 
@@ -117,8 +125,9 @@ fn main() {
 
         if command == "send" {
             // For now: send a random message to a random PK
-            client::send_random_message(&blockchain.lock().unwrap().swarm_manager, &mut rng);
-
+            if client::send_random_message(&blockchain.lock().unwrap().swarm_manager, &mut rng).is_err() {
+                eprintln!("got error sending messages");
+            }
 
             // for _ in 0..1000 {
             //     client::send_random_message(&blockchain.lock().unwrap().swarm_manager);

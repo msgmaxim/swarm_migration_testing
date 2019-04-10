@@ -6,7 +6,10 @@ use rand::prelude::*;
 use std::fmt::{self, Debug, Display};
 use std::sync::{Arc, Mutex};
 
+use crate::swarms::PubKey;
 use crate::swarms::ServiceNode;
+
+use crate::client::MessageResponse;
 
 use crate::client;
 
@@ -33,6 +36,12 @@ impl Display for TestContext {
 
 }
 
+impl Debug for TestContext {
+    fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", *self.bc.lock().unwrap())
+    }
+}
+
 impl TestContext {
     pub fn new(bc: Arc<Mutex<Blockchain>>) -> TestContext {
         TestContext {
@@ -55,12 +64,29 @@ impl TestContext {
     }
 
     pub fn send_message(&mut self, pk: &str, msg: &str) {
-        client::send_message_to_pk(&self.bc.lock().unwrap().swarm_manager, pk, msg);
+        if client::send_message_to_pk(&self.bc.lock().unwrap().swarm_manager, pk, msg).is_ok() {
 
         self.messages
             .entry(pk.to_owned())
             .or_insert(vec![])
             .push(msg.to_owned());
+        }
+
+    }
+
+    /// Get messages for `pk` that come after the message with the specified `last_hash`
+    pub fn get_new_messages(&self, pk: &PubKey, last_hash: &str) -> Vec<MessageResponse> {
+
+        // 1. Find the closest swarm
+        let sm = &self.bc.lock().unwrap().swarm_manager;
+        let swarm_idx = sm.get_swarm_by_pk(&pk) as usize;
+        let swarm = &sm.swarms[swarm_idx];
+
+        // 2. Request messages from one of the nodes
+
+        let sn = &swarm.nodes[0];
+
+        client::request_messages_given_hash(&sn, &pk.to_string(), &last_hash)
     }
 
     pub fn send_random_message(&mut self) {
@@ -82,7 +108,6 @@ impl TestContext {
 
     /// Check that all previously sent messages are still available
     pub fn check_messages(&self) {
-        use crate::swarms::PubKey;
 
         let mut lost_count = 0;
         let mut messages_tested = 0;
