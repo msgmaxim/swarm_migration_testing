@@ -1,0 +1,17 @@
+refresh_rate: 30 seconds
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "[{l}] {m}{n}"
+  requests:
+    kind: file
+    path: "log/requests.log"
+    encoder:
+      pattern: "{d}: [{l}] {m}{n}"
+root:
+  level: warn
+  appenders:
+    - requests
+# loggers:
+  # level: info
