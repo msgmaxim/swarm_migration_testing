@@ -9,13 +9,74 @@ use rand::seq::SliceRandom;
 use rand::prelude::*;
 use std::fmt::{self, Debug};
 
+use futures::future::lazy;
+
+fn sleep_ms(ms : u64) {
+    std::thread::sleep(std::time::Duration::from_millis(ms));
+}
+
+pub fn async_test(bc: Arc<Mutex<Blockchain>>) {
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+    ctx.add_swarm(1);
+
+    sleep_ms(300);
+
+    // make a copy here assuming that swarms are not going to change
+
+    let mut rng = StdRng::seed_from_u64(0);
+    let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0].ip.clone();
+    let pk = PubKey::gen_random(&mut rng).to_string();
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let mut failed_total = Arc::new(Mutex::new(0));
+    let mut saved_total = Arc::new(Mutex::new(0));
+
+    let mut failed = failed_total.clone();
+    let mut saved = saved_total.clone();
+
+    tokio::run(lazy(move || {
+
+        let client = hyper::Client::new();
+
+        for _ in 0..150 {
+            let msg = crate::client::make_random_message(&mut rng);
+            let fut = crate::client::send_message_async(&client, &ip, &pk, &msg);
+
+            let mut failed = failed.clone();
+            let mut saved = saved.clone();
+
+            let mut failed2 = failed.clone();
+
+            tokio::spawn(fut.and_then(move |res| {
+                if res.status() == hyper::StatusCode::OK {
+                    *saved.lock().unwrap() += 1;
+                } else {
+                    *failed.lock().unwrap() += 1;
+                }
+                Ok(())
+            }).map_err(move |err| {
+                *failed2.lock().unwrap() += 1;
+                eprintln!("error: {}", err)
+            }
+            ));
+        }
+
+        Ok(())
+
+    }));
+
+    println!("saved total: {}", saved_total.lock().unwrap());
+    println!("failed total: {}", failed_total.lock().unwrap());
+
+}
 
 pub fn one_node_big_data(bc: Arc<Mutex<Blockchain>>) {
 
     let mut ctx = TestContext::new(Arc::clone(&bc));
     ctx.add_swarm(1);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     // spawn N threads and bombard with messages
 
@@ -65,11 +126,10 @@ pub fn one_node_big_data(bc: Arc<Mutex<Blockchain>>) {
         t.join().unwrap();
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    sleep_ms(200);
 
     println!("saved total: {}", saved_total.lock().unwrap());
     println!("failed total: {}", failed_total.lock().unwrap());
-
 
 }
 
@@ -83,7 +143,7 @@ pub fn long_polling(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(1);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     // have a "client" running in parallel first performing short polling;
 
@@ -101,7 +161,7 @@ pub fn long_polling(bc: Arc<Mutex<Blockchain>>) {
         let mut last_hash = String::new();
 
         for _ in 0..30 {
-            std::thread::sleep_ms(100);
+            sleep_ms(100);
             let msgs = ctx_clone.lock().unwrap().get_new_messages(&pk_clone, &last_hash);
             dbg!(&msgs);
 
@@ -113,7 +173,7 @@ pub fn long_polling(bc: Arc<Mutex<Blockchain>>) {
     });
 
     // send another message in 2s
-    std::thread::sleep_ms(2000);
+    sleep_ms(2000);
     crate::client::send_message(&ip, &pk.to_string(), "второе сообщение");
 
 }
@@ -127,7 +187,7 @@ pub fn test_bootstrapping_peer_big_data(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.add_swarm(1);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     for _ in 0..10000 {
         ctx.send_random_message();
@@ -135,7 +195,7 @@ pub fn test_bootstrapping_peer_big_data(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.add_snode();
 
-    std::thread::sleep(std::time::Duration::from_millis(10000));
+    sleep_ms(10000);
     ctx.check_messages();
 
 }
@@ -148,7 +208,7 @@ pub fn test_bootstrapping_swarm_big_data(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.add_swarm(1);
     
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     // TODO: send messages concurrently (asynchronously?)
 
@@ -158,7 +218,7 @@ pub fn test_bootstrapping_swarm_big_data(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.add_swarm(1);
 
-    std::thread::sleep(std::time::Duration::from_millis(10000));
+    sleep_ms(10000);
     ctx.check_messages();
 
 }
@@ -170,11 +230,11 @@ pub fn single_node_one_message(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(1);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "マンゴー");
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 }
@@ -187,11 +247,11 @@ pub fn single_swarm_one_message(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(3);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 }
@@ -204,16 +264,16 @@ pub fn sinlge_swarm_joined(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(3);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().add_snode();
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 }
@@ -226,16 +286,16 @@ pub fn swarm_splitting(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(3);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().add_swarm(3);
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 }
@@ -250,12 +310,12 @@ pub fn multiple_swarms_static(bc: Arc<Mutex<Blockchain>>) {
     ctx.lock().unwrap().add_swarm(2);
     ctx.lock().unwrap().add_swarm(2);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
     ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 
@@ -271,26 +331,26 @@ pub fn test_dissolving(bc: Arc<Mutex<Blockchain>>) {
     ctx.add_swarm(1);
 
     // give SNs some time to initialize their servers
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A");
     ctx.send_message("2b959eac778ee6bfac5e02c29800d489d319b65a9b8960a4cf4d3f40285b7735", "B");
     ctx.send_message("18b593e832ffda161c20a5daf842ab787ee7181a369ff7034fe80fb2774e0664", "C");
     ctx.send_message("17311f5ae7ce94b79698f12be6f3a2d66ec036fcf77506bf74877381630093af", "D");
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     // Some messages will go to swarm 1, dissolve it
     // Now some of them will go to swarm 0, and the rest will go to swarm 2
     &bc.lock().unwrap().swarm_manager.dissolve_swarm(1);
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
     ctx.send_message("2b959eac778ee6bfac5e02c29800d489d319b65a9b8960a4cf4d3f40285b7735", "B2");
     ctx.send_message("18b593e832ffda161c20a5daf842ab787ee7181a369ff7034fe80fb2774e0664", "C2");
     ctx.send_message("17311f5ae7ce94b79698f12be6f3a2d66ec036fcf77506bf74877381630093af", "D2");
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
     ctx.check_messages();
 
 }
@@ -303,7 +363,7 @@ pub fn test_snode_disconnecting(bc: Arc<Mutex<Blockchain>>) {
 
     ctx.lock().unwrap().add_swarm(2);
 
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    sleep_ms(300);
 
     ctx.lock().unwrap().send_random_message();
     ctx.lock().unwrap().send_random_message();
@@ -315,7 +375,7 @@ pub fn test_snode_disconnecting(bc: Arc<Mutex<Blockchain>>) {
     ctx.lock().unwrap().send_random_message();
     ctx.lock().unwrap().send_random_message();
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 
@@ -350,7 +410,7 @@ pub fn test_blocks(bc : Arc<Mutex<Blockchain>>) {
 
         for _ in 0..1000 {
             // give SNs some time to initialize their servers
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            sleep_ms(50);
 
             let pk = pks.choose(&mut rng_clone).unwrap();
 
@@ -368,7 +428,7 @@ pub fn test_blocks(bc : Arc<Mutex<Blockchain>>) {
         warn!("iteration: {}", i);
         // how much to wait until the next block
         let ms = rng.gen_range(500, 2000);
-        std::thread::sleep(std::time::Duration::from_millis(ms));
+        sleep_ms(ms);
 
         // deregister some
         if ctx.lock().unwrap().snode_count() > 10 {
@@ -394,7 +454,7 @@ pub fn test_blocks(bc : Arc<Mutex<Blockchain>>) {
 
     message_thread.join().unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().print_stats();
     ctx.lock().unwrap().check_messages();
@@ -425,7 +485,7 @@ pub fn large_test(bc: Arc<Mutex<Blockchain>>) {
 
         for i in 0..100 {
         // create a node every second
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+            sleep_ms(1000);
 
             let num = rng.gen_range(5, 10);
             if ctx_clone.lock().unwrap().snode_count() > num {
@@ -442,11 +502,11 @@ pub fn large_test(bc: Arc<Mutex<Blockchain>>) {
 
         let mut rng = StdRng::seed_from_u64(0);
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        sleep_ms(50);
 
         for _ in 0..2000 {
             // give SNs some time to initialize their servers
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            sleep_ms(50);
 
             let pk = pks.choose(&mut rng).unwrap();
 
@@ -458,7 +518,7 @@ pub fn large_test(bc: Arc<Mutex<Blockchain>>) {
     node_thread.join().unwrap();
     message_thread.join().unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 
@@ -478,7 +538,7 @@ pub fn test_with_wierd_clients(bc: Arc<Mutex<Blockchain>>) {
 
     std::thread::spawn(move || {
         // give SNs some time to initialize their servers
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        sleep_ms(200);
 
 
         // Construct an unreasonably large message:
@@ -491,11 +551,11 @@ pub fn test_with_wierd_clients(bc: Arc<Mutex<Blockchain>>) {
 
         ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", &large_msg);
 
-        std::thread::sleep(std::time::Duration::from_millis(2000));
+        sleep_ms(2000);
 
         ctx.lock().unwrap().check_messages();
 
-        std::thread::sleep(std::time::Duration::from_millis(2000));
+        sleep_ms(2000);
 
         ctx.lock().unwrap().check_messages();
 
@@ -532,15 +592,15 @@ fn test_small_random(bc: Arc<Mutex<Blockchain>>) {
 
     let node_thread = std::thread::spawn(move || {
 
-        std::thread::sleep(std::time::Duration::from_millis(1000));
+        sleep_ms(1000);
         ctx_clone.lock().unwrap().add_snode();
 
         ctx_clone.lock().unwrap().send_random_message();
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        sleep_ms(100);
         ctx_clone.lock().unwrap().send_random_message();
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        sleep_ms(100);
         ctx_clone.lock().unwrap().send_random_message();
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        sleep_ms(100);
 
         ctx_clone.lock().unwrap().drop_snode();
 
@@ -553,7 +613,7 @@ fn test_small_random(bc: Arc<Mutex<Blockchain>>) {
 
     node_thread.join().unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    sleep_ms(2000);
 
     ctx.lock().unwrap().check_messages();
 

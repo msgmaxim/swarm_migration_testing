@@ -76,7 +76,8 @@ fn main() {
         rpc_server::start_http_server(bc);
     });
 
-    tests::long_polling(Arc::clone(&blockchain));
+    tests::async_test(Arc::clone(&blockchain));
+    // tests::long_polling(Arc::clone(&blockchain));
     // tests::one_node_big_data(Arc::clone(&blockchain));
     // tests::test_bootstrapping_peer_big_data(Arc::clone(&blockchain));
     // tests::test_bootstrapping_swarm_big_data(Arc::clone(&blockchain));

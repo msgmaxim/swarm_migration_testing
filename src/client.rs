@@ -64,6 +64,40 @@ pub fn make_random_message(rng : &mut StdRng) -> String {
     num.to_string() + &num.to_string() + &num.to_string()
 }
 
+use hyper::client::HttpConnector;
+
+pub fn send_message_async(client: &hyper::Client<HttpConnector, Body>, port: &str, pk: &str, msg: &str) -> hyper::client::ResponseFuture {
+
+    let pk = "05".to_owned() + &pk;
+    let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+
+    let msg = StoreBody {
+        method: "store".to_owned(),
+        params: StoreArgs {
+            pubKey: pk.clone(),
+            ttl: "86400".to_owned(),
+            nonce: "324324".to_owned(),
+            timestamp: timestamp.to_string(),
+            data: msg.to_owned(),
+        },
+    };
+
+    let body = serde_json::to_string(&msg).unwrap();
+
+    let target = "/v1/storage_rpc";
+    let uri = "http://localhost:".to_owned() + port + target;
+    let uri: hyper::Uri = uri.parse().unwrap();
+
+    let mut req = hyper::Request::new(Body::from(body));
+    *req.method_mut() = hyper::Method::POST;
+    *req.uri_mut() = uri.clone();
+    req.headers_mut().insert(
+        "X-Loki-ephemkey", hyper::header::HeaderValue::from_str("86400").unwrap()
+    );
+
+    client.request(req)
+}
+
 pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
     let target = "/v1/storage_rpc";
     let addr = "http://localhost:".to_owned() + port + target;
@@ -171,9 +205,8 @@ pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) 
 
     let req = client
         .post(&addr)
-        .header("X-Loki-ttl", "86400")
         .header("X-Loki-ephemkey", "86400")
-        .header("X-Loki-timestamp", "1540860811000")
+        .header("x-loki-long-poll", "")
         .body(msg);
 
     match req.send() {

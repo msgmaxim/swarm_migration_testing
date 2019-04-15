@@ -116,7 +116,7 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg("0.0.0.0");
     server_process.arg(sn.ip.to_string());
     server_process.arg("--log-level");
-    server_process.arg("debug");
+    server_process.arg("trace");
 
     match server_process.spawn() {
         Ok(child) => Some(child),
