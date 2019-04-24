@@ -1,13 +1,14 @@
 use crate::rpc_server::Blockchain;
 
-use std::collections::HashMap;
 use rand::prelude::*;
+use std::collections::HashMap;
 
 use std::fmt::{self, Debug, Display};
 use std::sync::{Arc, Mutex};
 
 use crate::swarms::PubKey;
 use crate::swarms::ServiceNode;
+use crate::swarms::SpawnStrategy;
 
 use crate::client::MessageResponse;
 
@@ -18,7 +19,7 @@ pub struct TestContext {
     messages: HashMap<String, Vec<String>>,
     latest_port: u16,
     bad_snodes: Vec<ServiceNode>,
-    rng : StdRng,
+    rng: StdRng,
 }
 
 fn is_port_available(port: u16) -> bool {
@@ -29,15 +30,13 @@ fn is_port_available(port: u16) -> bool {
 }
 
 impl Display for TestContext {
-
-    fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.bc.lock().unwrap())
     }
-
 }
 
 impl Debug for TestContext {
-    fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", *self.bc.lock().unwrap())
     }
 }
@@ -49,7 +48,7 @@ impl TestContext {
             messages: HashMap::new(),
             latest_port: 5901,
             bad_snodes: vec![],
-            rng : StdRng::seed_from_u64(0)
+            rng: StdRng::seed_from_u64(0),
         }
     }
 
@@ -65,18 +64,15 @@ impl TestContext {
 
     pub fn send_message(&mut self, pk: &str, msg: &str) {
         if client::send_message_to_pk(&self.bc.lock().unwrap().swarm_manager, pk, msg).is_ok() {
-
-        self.messages
-            .entry(pk.to_owned())
-            .or_insert(vec![])
-            .push(msg.to_owned());
+            self.messages
+                .entry(pk.to_owned())
+                .or_insert(vec![])
+                .push(msg.to_owned());
         }
-
     }
 
     /// Get messages for `pk` that come after the message with the specified `last_hash`
     pub fn get_new_messages(&self, pk: &PubKey, last_hash: &str) -> Vec<MessageResponse> {
-
         // 1. Find the closest swarm
         let sm = &self.bc.lock().unwrap().swarm_manager;
         let swarm_idx = sm.get_swarm_by_pk(&pk) as usize;
@@ -90,15 +86,19 @@ impl TestContext {
     }
 
     pub fn send_random_message(&mut self) {
-        if let Ok(msg) = client::send_random_message(&self.bc.lock().unwrap().swarm_manager, &mut self.rng) {
+        if let Ok(msg) =
+            client::send_random_message(&self.bc.lock().unwrap().swarm_manager, &mut self.rng)
+        {
             self.messages.entry(msg.0).or_insert(vec![]).push(msg.1);
         }
     }
 
     pub fn send_random_message_to_pk(&mut self, pk: &str) {
-        if let Ok(msg) =
-            client::send_random_message_to_pk(&self.bc.lock().unwrap().swarm_manager, &pk, &mut self.rng)
-        {
+        if let Ok(msg) = client::send_random_message_to_pk(
+            &self.bc.lock().unwrap().swarm_manager,
+            &pk,
+            &mut self.rng,
+        ) {
             self.messages
                 .entry(pk.to_owned())
                 .or_insert(vec![])
@@ -108,7 +108,6 @@ impl TestContext {
 
     /// Check that all previously sent messages are still available
     pub fn check_messages(&self) {
-
         let mut lost_count = 0;
         let mut messages_tested = 0;
 
@@ -123,8 +122,9 @@ impl TestContext {
             let swarm = &sm.swarms[swarm_idx as usize];
 
             for sn in &swarm.nodes {
-
-                if self.bad_snodes.contains(&sn) { continue };
+                if self.bad_snodes.contains(&sn) {
+                    continue;
+                };
                 warn!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.ip);
 
                 let got_msgs = client::request_messages(&sn, key);
@@ -163,37 +163,69 @@ impl TestContext {
     }
 
     pub fn print_stats(&self) {
-
-        println!("Total dissoved: {}", &self.bc.lock().unwrap().swarm_manager.stats.dissolved);
-
+        println!(
+            "Total dissoved: {}",
+            &self.bc.lock().unwrap().swarm_manager.stats.dissolved
+        );
     }
 
     /// Swarm manager should decide where to push this SN
-    pub fn add_snode(&mut self) {
+    fn add_snode_with_options(&mut self, spawn: SpawnStrategy) -> Option<ServiceNode> {
+        let mut res = None;
+
         // find available port starting with 5904
         for i in (self.latest_port + 1)..7000 {
             if is_port_available(i) {
-                &self
-                    .bc
-                    .lock()
-                    .unwrap()
-                    .swarm_manager
-                    .add_snode(&i.to_string());
+                let sn = ServiceNode { ip: i.to_string() };
+                self.bc.lock().unwrap().swarm_manager.add_snode(&sn, spawn);
+
+                res = Some(sn);
 
                 self.latest_port = i;
 
                 break;
             }
         }
+
+        res
+    }
+
+    pub fn add_snode(&mut self) {
+        let _sn = self.add_snode_with_options(SpawnStrategy::Now);
+    }
+
+    /// Register a new SN, but spawn its server instance
+    /// only after the specified period of time
+    pub fn add_snode_delayed(&mut self, delay_ms: u64) {
+        let sn = self.add_snode_with_options(SpawnStrategy::Later);
+
+        let bc_copy = self.bc.clone();
+
+        let t = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+            bc_copy.lock().unwrap().swarm_manager.restore_snode(&sn.expect("spawned node is none"));
+        });
     }
 
     /// Shut down the snode's server without explicitly deregistering it.
     /// Mark this snode as known to have a problem, so that not being able to
     /// recieve messages from this node is not a problem
     pub fn disconnect_snode(&mut self) {
-
         let sn = self.bc.lock().unwrap().swarm_manager.disconnect_snode();
         self.bad_snodes.push(sn);
+    }
+
+    pub fn restart_snode(&mut self, delay_ms: u64) {
+        let sn = self.bc.lock().unwrap().swarm_manager.disconnect_snode();
+
+        // connect again after a short time
+
+        let bc_copy = self.bc.clone();
+
+        let t = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+            bc_copy.lock().unwrap().swarm_manager.restore_snode(&sn);
+        });
     }
 
     pub fn drop_snode(&mut self) {

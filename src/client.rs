@@ -347,7 +347,10 @@ pub fn send_random_message(sm: &SwarmManager, mut rng : &mut StdRng) -> Result<(
 
     let swarm_idx = sm.get_swarm_by_pk(&pk);
 
-    let sn = &sm.swarms[swarm_idx as usize].nodes.choose(&mut rng).unwrap();
+    // Note: commented out, as we want to make sure we send messages to a snode
+    // that is online (for testing disconnected snodes in some tests)
+    // let sn = &sm.swarms[swarm_idx as usize].nodes.choose(&mut rng).unwrap();
+    let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
     let num = rng.gen::<u64>();
     let msg = num.to_string() + &num.to_string() + &num.to_string();

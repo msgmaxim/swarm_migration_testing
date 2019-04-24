@@ -117,6 +117,7 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg(sn.ip.to_string());
     server_process.arg("--log-level");
     server_process.arg("trace");
+    // server_process.arg("debug");
 
     match server_process.spawn() {
         Ok(child) => Some(child),
@@ -125,6 +126,11 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
             None
         }
     }
+}
+
+pub enum SpawnStrategy {
+    Now,
+    Later
 }
 
 impl SwarmManager {
@@ -349,20 +355,39 @@ impl SwarmManager {
         }
     }
 
-    pub fn add_snode(&mut self, sn : &str) {
+    pub fn restore_snode(&mut self, sn : &ServiceNode) {
 
-        let sn = ServiceNode { ip: sn.to_owned() };
-
-        warn!("NEW SNODE: {}", &sn.ip);
+        // TODO: check that snode actually exists
+        warn!("Restore SNODE: {}", &sn.ip);
         let child = spawn_service_node(&sn).expect("error spawning a service node");
         self.children.push(child);
+
+        // Note: we don't apply any swarm changes since
+        // we haven't properly deregistered in the first place
+    }
+
+    /// Handle new snode registration. If `spawn` is true,
+    /// spawn a new server instance
+    pub fn add_snode(&mut self, sn : &ServiceNode, spawn: SpawnStrategy) {
+
+
+        warn!("NEW SNODE: {}", &sn.ip);
+        match spawn {
+            SpawnStrategy::Now => {
+                let child = spawn_service_node(&sn).expect("error spawning a service node");
+                self.children.push(child);
+            }
+            SpawnStrategy::Later => {
+                info!("SN will be registered now, but instantiated later");
+            }
+        }
 
         // Figure out which swarm this node is to join
         let mut rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
 
         info!("choosing swarm: {}", rand_swarm.swarm_id);
 
-        rand_swarm.nodes.push(sn);
+        rand_swarm.nodes.push(sn.clone());
 
         // See if we need to make a new swarm
         let total_extra = self.swarms.iter().fold(0, |sum, x| if x.nodes.len() > MIN_SWARM_SIZE { sum + x.nodes.len() - MIN_SWARM_SIZE} else { sum } );
