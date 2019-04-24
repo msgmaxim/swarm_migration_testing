@@ -13,17 +13,18 @@ extern crate log4rs;
 mod client;
 mod rpc_server;
 mod swarms;
-mod tests;
 mod test_context;
+mod tests;
 
-use std::io::prelude::*;
 use rand::prelude::*;
+use std::io::prelude::*;
 use swarms::*;
 
 use std::sync::{Arc, Mutex};
 use test_context::TestContext;
+use rpc_server::Blockchain;
 
-fn print_sn_data(sm : &SwarmManager, swarm: &Swarm) {
+fn print_sn_data(sm: &SwarmManager, swarm: &Swarm) {
     for sn in &swarm.nodes {
         println!("[{}]", &sn.ip);
 
@@ -61,8 +62,27 @@ fn send_req_to_quit(sn: &ServiceNode) {
     }
 }
 
-fn main() {
+fn gracefully_exit(bc : & Arc<Mutex<Blockchain>>) {
+    let sm = &mut bc.lock().unwrap().swarm_manager;
+    print!("Quitting {} nodes...", sm.children.len());
+    for sn in sm.swarms.iter() {
+        for node in sn.nodes.iter() {
+            send_req_to_quit(&node);
+        }
+    }
 
+    for sn in sm.children.iter_mut() {
+        sn.wait().unwrap();
+    }
+
+    println!("done");
+
+    // Not sure how to stop rpc the server,
+    // or whether that is even necessary
+    std::process::exit(0);
+}
+
+fn main() {
     // Overwrite logs with every run
     let path = std::path::Path::new("log");
     if path.exists() {
@@ -85,7 +105,16 @@ fn main() {
         rpc_server::start_http_server(bc);
     });
 
-    // tests::async_test(Arc::clone(&blockchain));
+    let bc = Arc::clone(&blockchain);
+
+    // Handle Ctrl+C
+    ctrlc::set_handler(move || {
+        println!(""); // go to next line
+        gracefully_exit(&bc);
+    })
+    .expect("error handling Ctrl+C handler");
+
+    // tests::async_test(&blockchain);
     // tests::long_polling(Arc::clone(&blockchain));
     // tests::one_node_big_data(Arc::clone(&blockchain));
     // tests::test_bootstrapping_peer_big_data(Arc::clone(&blockchain));
@@ -100,7 +129,6 @@ fn main() {
     tests::test_blocks(Arc::clone(&blockchain));
     // blockchain.lock().unwrap().reset();
 
-
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
 
@@ -114,7 +142,6 @@ fn main() {
         }
 
         if command == "purge" {
-
             println!("purging...");
 
             for sn in blockchain.lock().unwrap().swarm_manager.swarms.iter() {
@@ -122,7 +149,6 @@ fn main() {
                     send_req_to_purge(&node);
                 }
             }
-
         }
 
         if command == "test" {
@@ -136,7 +162,9 @@ fn main() {
 
         if command == "send" {
             // For now: send a random message to a random PK
-            if client::send_random_message(&blockchain.lock().unwrap().swarm_manager, &mut rng).is_err() {
+            if client::send_random_message(&blockchain.lock().unwrap().swarm_manager, &mut rng)
+                .is_err()
+            {
                 eprintln!("got error sending messages");
             }
 
@@ -150,19 +178,8 @@ fn main() {
 
     println!("waiting for service nodes to finish");
 
-    let sm = &mut blockchain.lock().unwrap().swarm_manager;
+    gracefully_exit(&blockchain);
 
-    for sn in sm.swarms.iter() {
-        for node in sn.nodes.iter() {
-            send_req_to_quit(&node);
-        }
-    }
-
-    for sn in sm.children.iter_mut() {
-        sn.wait().unwrap();
-    }
-
-    println!("RPC server thread is still running");
-
+    // Will never be reached, just in case
     server_thread.join().unwrap();
 }

@@ -16,7 +16,10 @@ fn sleep_ms(ms : u64) {
 }
 
 #[allow(dead_code)]
-pub fn async_test(bc: Arc<Mutex<Blockchain>>) {
+pub fn async_test(blockchain: &Arc<Mutex<Blockchain>>) {
+
+    let bc = blockchain.clone();
+
     let mut ctx = TestContext::new(Arc::clone(&bc));
     ctx.add_swarm(1);
 
