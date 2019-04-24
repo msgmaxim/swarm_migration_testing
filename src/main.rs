@@ -115,19 +115,18 @@ fn main() {
     .expect("error handling Ctrl+C handler");
 
     // tests::async_test(&blockchain);
-    // tests::long_polling(Arc::clone(&blockchain));
-    // tests::one_node_big_data(Arc::clone(&blockchain));
-    // tests::test_bootstrapping_peer_big_data(Arc::clone(&blockchain));
-    // tests::test_bootstrapping_swarm_big_data(Arc::clone(&blockchain));
-    // tests::single_node_one_message(Arc::clone(&blockchain));
-    // tests::single_swarm_one_message(Arc::clone(&blockchain));
-    // tests::sinlge_swarm_joined(Arc::clone(&blockchain));
-    // tests::test_dissolving(Arc::clone(&blockchain));
-    // tests::test_retry_batches(Arc::clone(&blockchain));
-    // tests::test_retry_singles(Arc::clone(&blockchain));
-    // tests::large_test(Arc::clone(&blockchain));
-    tests::test_blocks(Arc::clone(&blockchain));
-    // blockchain.lock().unwrap().reset();
+    // tests::long_polling(&blockchain);
+    // tests::one_node_big_data(&blockchain);
+    // tests::test_bootstrapping_peer_big_data(&blockchain);
+    // tests::test_bootstrapping_swarm_big_data(&blockchain);
+    // tests::single_node_one_message(&blockchain);
+    // tests::single_swarm_one_message(&blockchain);
+    // tests::sinlge_swarm_joined(&blockchain);
+    // tests::test_dissolving(&blockchain);
+    // tests::test_retry_batches(&blockchain);
+    // tests::test_retry_singles(&blockchain);
+    // tests::large_test(&blockchain);
+    tests::test_blocks(&blockchain);
 
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
