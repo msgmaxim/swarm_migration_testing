@@ -108,26 +108,37 @@ impl Blockchain {
     }
 }
 
-pub fn start_http_server(bc: Arc<Mutex<Blockchain>>) {
-    let server = simple_server::Server::new(move |req, mut res| {
-        let req_body = String::from_utf8_lossy(req.body());
+/// Starts a new thread
+pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::JoinHandle<()>
+{
 
-        let mut res_body = String::new();
+    let bc = Arc::clone(&blockchain);
 
-        if req.uri() == "/json_rpc" {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&req_body) {
-                res_body = bc.lock().unwrap().process_json_rpc(val);
-            } else {
-                warn!("invalid json: \n{:?}", &req_body);
+    let thread = std::thread::spawn(move || {
+
+        let server = simple_server::Server::new(move |req, mut res| {
+            let req_body = String::from_utf8_lossy(req.body());
+
+            let mut res_body = String::new();
+
+            if req.uri() == "/json_rpc" {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&req_body) {
+                    res_body = bc.lock().unwrap().process_json_rpc(val);
+                } else {
+                    warn!("invalid json: \n{:?}", &req_body);
+                }
             }
-        }
 
-        let final_res = res.body(res_body.as_bytes().to_vec()).unwrap();
+            let final_res = res.body(res_body.as_bytes().to_vec()).unwrap();
 
-        Ok(final_res)
+            Ok(final_res)
+        });
+
+        println!("starting RPC server on port 38157...");
+
+        server.listen("0.0.0.0", "38157");
+
     });
 
-    println!("starting RPC server on port 38157...");
-
-    server.listen("0.0.0.0", "38157");
+    thread
 }

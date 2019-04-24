@@ -20,9 +20,9 @@ use rand::prelude::*;
 use std::io::prelude::*;
 use swarms::*;
 
+use rpc_server::Blockchain;
 use std::sync::{Arc, Mutex};
 use test_context::TestContext;
-use rpc_server::Blockchain;
 
 fn print_sn_data(sm: &SwarmManager, swarm: &Swarm) {
     for sn in &swarm.nodes {
@@ -62,7 +62,7 @@ fn send_req_to_quit(sn: &ServiceNode) {
     }
 }
 
-fn gracefully_exit(bc : & Arc<Mutex<Blockchain>>) {
+fn gracefully_exit(bc: &Arc<Mutex<Blockchain>>) {
     let sm = &mut bc.lock().unwrap().swarm_manager;
     print!("Quitting {} nodes...", sm.children.len());
     for sn in sm.swarms.iter() {
@@ -77,7 +77,7 @@ fn gracefully_exit(bc : & Arc<Mutex<Blockchain>>) {
 
     println!("done");
 
-    // Not sure how to stop rpc the server,
+    // Not sure how to stop rpc tqhe server,
     // or whether that is even necessary
     std::process::exit(0);
 }
@@ -92,18 +92,16 @@ fn main() {
     log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
 
     let path = std::path::Path::new("playground");
-    std::fs::remove_dir_all(&path).expect("Could not remove existing 'playground' directory");
+    if path.exists() {
+        std::fs::remove_dir_all(&path).expect("Could not remove existing 'playground' directory");
+    }
 
-    let mut swarm_manager = SwarmManager::new();
-    let blockchain = rpc_server::Blockchain::new(swarm_manager);
+    let swarm_manager = SwarmManager::new();
+    let blockchain = Blockchain::new(swarm_manager);
     let blockchain = Arc::new(Mutex::new(blockchain));
 
-    let bc = Arc::clone(&blockchain);
-
     // start RPC server
-    let server_thread = std::thread::spawn(move || {
-        rpc_server::start_http_server(bc);
-    });
+    let server_thread = rpc_server::start_http_server(&blockchain);
 
     let bc = Arc::clone(&blockchain);
 
@@ -166,12 +164,6 @@ fn main() {
             {
                 eprintln!("got error sending messages");
             }
-
-            // for _ in 0..1000 {
-            //     client::send_random_message(&blockchain.lock().unwrap().swarm_manager);
-            // }
-
-            // client::barrage_messages("5902");
         }
     }
 
