@@ -63,7 +63,16 @@ fn send_req_to_quit(sn: &ServiceNode) {
 
 fn main() {
 
+    // Overwrite logs with every run
+    let path = std::path::Path::new("log");
+    if path.exists() {
+        std::fs::remove_dir_all("log").expect("could not remove 'log' directory");
+    }
+
     log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
+
+    let path = std::path::Path::new("playground");
+    std::fs::remove_dir_all(&path).expect("Could not remove existing 'playground' directory");
 
     let mut swarm_manager = SwarmManager::new();
     let blockchain = rpc_server::Blockchain::new(swarm_manager);

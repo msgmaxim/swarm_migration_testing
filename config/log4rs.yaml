@@ -4,14 +4,14 @@ appenders:
     kind: console
     encoder:
       pattern: "[{l}] {m}{n}"
-  requests:
+  tests:
     kind: file
-    path: "log/requests.log"
+    path: "log/tests.log"
     encoder:
       pattern: "{d}: [{l}] {m}{n}"
 root:
   level: warn
   appenders:
-    - requests
+    - tests
 # loggers:
   # level: info
