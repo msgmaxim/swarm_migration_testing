@@ -250,4 +250,9 @@ impl TestContext {
 
         &self.bc.lock().unwrap().swarm_manager.add_swarm(&ports);
     }
+
+    pub fn inc_block_height(&mut self) {
+        let mut bc = &mut self.bc.lock().unwrap();
+        bc.height += 1;
+    }
 }

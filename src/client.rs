@@ -311,7 +311,7 @@ pub fn send_message_to_pk(sm: &SwarmManager, pk_str: &str, msg: &str) -> Result<
     res
 }
 
-
+#[allow(dead_code)]
 pub fn barrage_messages(port: &str) {
 
     let mut futs = vec![];

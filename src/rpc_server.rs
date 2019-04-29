@@ -63,7 +63,8 @@ struct SwarmResponse {
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
 
-        let height = 0;
+        // 0 is used to indicate that SN haven't synced yet
+        let height = 1;
         Blockchain { swarm_manager, height }
     }
 
@@ -83,7 +84,7 @@ impl Blockchain {
 
         let service_node_states = sn_list;
 
-        let mut response = SwarmResponse { result : SwarmResult { service_node_states, height: self.height } };
+        let response = SwarmResponse { result : SwarmResult { service_node_states, height: self.height } };
 
         serde_json::to_string(&response).expect("could not construct json")
     }

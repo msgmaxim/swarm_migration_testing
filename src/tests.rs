@@ -31,13 +31,11 @@ pub fn async_test(bc: &Arc<Mutex<Blockchain>>) {
     let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0].ip.clone();
     let pk = PubKey::gen_random(&mut rng).to_string();
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let failed_total = Arc::new(Mutex::new(0));
+    let saved_total = Arc::new(Mutex::new(0));
 
-    let mut failed_total = Arc::new(Mutex::new(0));
-    let mut saved_total = Arc::new(Mutex::new(0));
-
-    let mut failed = failed_total.clone();
-    let mut saved = saved_total.clone();
+    let failed = failed_total.clone();
+    let saved = saved_total.clone();
 
     tokio::run(lazy(move || {
 
@@ -92,8 +90,8 @@ pub fn one_node_big_data(bc: &Arc<Mutex<Blockchain>>) {
 
     // I have to manually count the messages as currently I can only use ctx locking
     // in every message (which defeats the purpose of this test)
-    let mut failed_total = Arc::new(Mutex::new(0));
-    let mut saved_total = Arc::new(Mutex::new(0));
+    let failed_total = Arc::new(Mutex::new(0));
+    let saved_total = Arc::new(Mutex::new(0));
 
     for i in 0..50 {
 
@@ -144,8 +142,8 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
 
     let mut rng = StdRng::seed_from_u64(0);
 
-    let mut ctx = TestContext::new(Arc::clone(&bc));
-    let mut ctx = Arc::new(Mutex::new(ctx));
+    let ctx = TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
 
     ctx.lock().unwrap().add_swarm(1);
 
@@ -188,7 +186,6 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
 #[allow(dead_code)]
 pub fn test_bootstrapping_peer_big_data(bc: &Arc<Mutex<Blockchain>>) {
 
-    let mut rng = StdRng::seed_from_u64(0);
 
     let mut ctx = TestContext::new(Arc::clone(&bc));
 
@@ -488,30 +485,37 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, reliable : bool) {
         let ms = rng.gen_range(500, 2000);
         sleep_ms(ms);
 
+        let mut ctx = ctx.lock().unwrap();
+
         // deregister some
-        if ctx.lock().unwrap().snode_count() > 10 {
+        if ctx.snode_count() > 10 {
             let n = rng.gen_range(0, 3);
             for _ in 0..n {
-                ctx.lock().unwrap().drop_snode();
+                ctx.drop_snode();
             }
 
             // IMPORTANT: it seems that setting this to a long delay
             // prevents SN from recovering. Could be because they miss
             // a few block updates
             if !reliable {
-                ctx.lock().unwrap().restart_snode(1000);
+                ctx.restart_snode(1000);
             }
         }
 
         // register some
-        if ctx.lock().unwrap().snode_count() < 50 {
+        if ctx.snode_count() < 50 {
             let n = rng.gen_range(0, 3);
             for _ in 0..n {
-                ctx.lock().unwrap().add_snode();
+                ctx.add_snode();
             }
         }
 
-        println!("swarms: {:?}", *ctx.lock().unwrap());
+        ctx.inc_block_height();
+
+        println!("swarms: {:?}", *ctx);
+
+        // release the lock
+        drop(ctx);
 
         if !*running.lock().unwrap() { break; }
 

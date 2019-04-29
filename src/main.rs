@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate serde_derive;
-
-#[macro_use]
 extern crate serde_json;
 
 #[macro_use]
@@ -22,7 +20,6 @@ use swarms::*;
 
 use rpc_server::Blockchain;
 use std::sync::{Arc, Mutex};
-use test_context::TestContext;
 
 fn print_sn_data(sm: &SwarmManager, swarm: &Swarm) {
     for sn in &swarm.nodes {
