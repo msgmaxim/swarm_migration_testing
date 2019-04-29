@@ -436,8 +436,10 @@ pub fn test_retry_batches(bc: &Arc<Mutex<Blockchain>>) {
 
 }
 
+/// `reliable` determines whether nodes can disconnect from time
+/// to time for a short period of time
 #[allow(dead_code)]
-pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>) {
+pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, reliable : bool) {
 
     let mut rng = StdRng::seed_from_u64(0);
 
@@ -491,6 +493,13 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>) {
             let n = rng.gen_range(0, 3);
             for _ in 0..n {
                 ctx.lock().unwrap().drop_snode();
+            }
+
+            // IMPORTANT: it seems that setting this to a long delay
+            // prevents SN from recovering. Could be because they miss
+            // a few block updates
+            if !reliable {
+                ctx.lock().unwrap().restart_snode(1000);
             }
         }
 

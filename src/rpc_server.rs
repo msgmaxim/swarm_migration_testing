@@ -1,5 +1,6 @@
 pub struct Blockchain {
     pub swarm_manager: SwarmManager,
+    pub height : u64
 }
 
 use std::sync::{Arc, Mutex};
@@ -50,8 +51,8 @@ struct ServiceNodeSwarmData {
 
 #[derive(Serialize)]
 struct SwarmResult {
-    // Note: lokid rpc currently sends "nested" json, so I have to serialize twice
-    as_json : String
+    service_node_states : Vec<ServiceNodeSwarmData>,
+    height : u64
 }
 
 #[derive(Serialize)]
@@ -61,7 +62,9 @@ struct SwarmResponse {
 
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
-        Blockchain { swarm_manager }
+
+        let height = 0;
+        Blockchain { swarm_manager, height }
     }
 
     pub fn reset(&mut self) {
@@ -78,7 +81,9 @@ impl Blockchain {
             }
         }
 
-        let mut response = SwarmResponse { result : SwarmResult { as_json : serde_json::to_string(&sn_list).expect("could not construct json") } };
+        let service_node_states = sn_list;
+
+        let mut response = SwarmResponse { result : SwarmResult { service_node_states, height: self.height } };
 
         serde_json::to_string(&response).expect("could not construct json")
     }

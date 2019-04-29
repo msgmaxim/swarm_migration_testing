@@ -143,7 +143,7 @@ impl TestContext {
                     messages_tested += 1;
 
                     if !got_msgs.contains(&msg) {
-                        error!("cannot find message {}", &msg);
+                        error!("message lost: {}", &msg);
                         error!("only got: {:?}", &got_msgs);
                         lost_count += 1;
                     };
@@ -217,6 +217,9 @@ impl TestContext {
 
     pub fn restart_snode(&mut self, delay_ms: u64) {
         let sn = self.bc.lock().unwrap().swarm_manager.disconnect_snode();
+
+        println!("restarted snode: {}", sn.ip);
+        info!("restarted snode: {}", sn.ip);
 
         // connect again after a short time
 

@@ -124,7 +124,7 @@ fn main() {
     // tests::test_retry_batches(&blockchain);
     // tests::test_retry_singles(&blockchain);
     // tests::large_test(&blockchain);
-    tests::test_blocks(&blockchain);
+    // tests::test_blocks(&blockchain, true);
 
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
