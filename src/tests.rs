@@ -149,8 +149,6 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
 
     sleep_ms(300);
 
-    // have a "client" running in parallel first performing short polling;
-
     let pk = PubKey::gen_random(&mut rng);
 
     let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0].ip.clone();
@@ -198,6 +196,7 @@ pub fn test_bootstrapping_peer_big_data(bc: &Arc<Mutex<Blockchain>>) {
     }
 
     ctx.add_snode();
+    ctx.inc_block_height();
 
     sleep_ms(10000);
     ctx.check_messages();
@@ -206,8 +205,6 @@ pub fn test_bootstrapping_peer_big_data(bc: &Arc<Mutex<Blockchain>>) {
 
 #[allow(dead_code)]
 pub fn test_bootstrapping_swarm_big_data(bc: &Arc<Mutex<Blockchain>>) {
-
-    let mut rng = StdRng::seed_from_u64(0);
 
     let mut ctx = TestContext::new(Arc::clone(&bc));
 
@@ -222,6 +219,7 @@ pub fn test_bootstrapping_swarm_big_data(bc: &Arc<Mutex<Blockchain>>) {
     }
 
     ctx.add_swarm(1);
+    ctx.inc_block_height();
 
     sleep_ms(10000);
     ctx.check_messages();
@@ -231,103 +229,100 @@ pub fn test_bootstrapping_swarm_big_data(bc: &Arc<Mutex<Blockchain>>) {
 /// 0. Most basic test: send a message to a single snode and check
 #[allow(dead_code)]
 pub fn single_node_one_message(bc: &Arc<Mutex<Blockchain>>) {
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(1);
+    ctx.add_swarm(1);
 
     sleep_ms(300);
 
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "マンゴー");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "マンゴー");
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 }
 
 /// 1. Test that nodes relay messages to other swarm members
 #[allow(dead_code)]
 pub fn single_swarm_one_message(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(3);
+    ctx.add_swarm(3);
 
     sleep_ms(300);
 
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 }
 
 /// 2. Test adding an additional snode to a swarm
 #[allow(dead_code)]
 pub fn sinlge_swarm_joined(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(3);
-
-    sleep_ms(300);
-
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+    ctx.add_swarm(3);
 
     sleep_ms(300);
 
-    ctx.lock().unwrap().add_snode();
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+
+    sleep_ms(300);
+
+    ctx.add_snode();
+    ctx.inc_block_height();
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 }
 
 /// 3. Test new swarm detection
 #[allow(dead_code)]
 pub fn swarm_splitting(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(3);
-
-    sleep_ms(300);
-
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+    ctx.add_swarm(3);
 
     sleep_ms(300);
 
-    ctx.lock().unwrap().add_swarm(3);
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+
+    sleep_ms(300);
+
+    ctx.add_swarm(3);
+    ctx.inc_block_height();
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 }
 
 /// 4. Test multiple swarms with no changes to the swarm composition
 #[allow(dead_code)]
 pub fn multiple_swarms_static(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(2);
-    ctx.lock().unwrap().add_swarm(2);
-    ctx.lock().unwrap().add_swarm(2);
+    ctx.add_swarm(2);
+    ctx.add_swarm(2);
+    ctx.add_swarm(2);
 
     sleep_ms(300);
 
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
-    ctx.lock().unwrap().send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A1");
+    ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
 }
 
@@ -353,7 +348,8 @@ pub fn test_dissolving(bc: &Arc<Mutex<Blockchain>>) {
 
     // Some messages will go to swarm 1, dissolve it
     // Now some of them will go to swarm 0, and the rest will go to swarm 2
-    &bc.lock().unwrap().swarm_manager.dissolve_swarm(1);
+    ctx.dissolve_swarm(1);
+    ctx.inc_block_height();
     sleep_ms(300);
 
     ctx.send_message("ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351", "A2");
@@ -370,85 +366,91 @@ pub fn test_dissolving(bc: &Arc<Mutex<Blockchain>>) {
 #[allow(dead_code)]
 pub fn test_retry_singles(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(2);
+    ctx.add_swarm(2);
 
     sleep_ms(300);
 
     // kill a random snode and restore it after 3s
-    ctx.lock().unwrap().restart_snode(3000);
+    ctx.restart_snode(3000);
 
 
     // Note: sometimes we send a message to a disconnected
     // node, resulting in that message not being accounted
     // for in `check_messages`
-    ctx.lock().unwrap().send_random_message();
-    // ctx.lock().unwrap().send_random_message();
-    // ctx.lock().unwrap().send_random_message();
+    ctx.send_random_message();
 
     sleep_ms(2000);
 
     println!("Checking messages (one node offilne, half of the messages should be lost)");
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
     println!("Waiting for a snode to come back online and be tested again...");
     sleep_ms(4000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
 }
 
 #[allow(dead_code)]
 pub fn test_retry_batches(bc: &Arc<Mutex<Blockchain>>) {
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
     // 1. Create a swarm with a single node
-    ctx.lock().unwrap().add_swarm(1);
+    ctx.add_swarm(1);
 
     // 2. Register a new snode joining the swarm, but
     // don't go online yet.
 
-    ctx.lock().unwrap().add_snode_delayed(3000);
+    ctx.add_snode_delayed(3000);
+    ctx.inc_block_height();
 
     sleep_ms(300);
 
     // 3. Send a bunch of messages
-    ctx.lock().unwrap().send_random_message();
-    ctx.lock().unwrap().send_random_message();
-    ctx.lock().unwrap().send_random_message();
+    ctx.send_random_message();
+    ctx.send_random_message();
+    ctx.send_random_message();
 
     sleep_ms(2000);
 
     println!("Checking messages (one node offilne, half of the messages should be lost)");
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
     println!("Waiting for a snode to come back online and be tested again...");
     sleep_ms(4000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
+}
+
+fn gen_rand_pubkeys(n : u32, mut rng : &mut StdRng) -> Vec<PubKey> {
+
+    let mut pks = vec![];
+
+    for _ in 0..n {
+        let pk = PubKey::gen_random(&mut rng);
+        pks.push(pk);
+    }
+
+    pks
+}
+
+
+pub struct TestOptions {
+    pub reliableSnodes : bool
 }
 
 /// `reliable` determines whether nodes can disconnect from time
 /// to time for a short period of time
 #[allow(dead_code)]
-pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, reliable : bool) {
+pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
 
     let mut rng = StdRng::seed_from_u64(0);
 
-    // Generate 100 users
-    let mut pks = vec![];
-
-    for _ in 0..100 {
-        let pk = PubKey::gen_random(&mut rng);
-        pks.push(pk);
-    }
-
-    let pks = pks; // remove mut
+    let pks = gen_rand_pubkeys(100, &mut rng);
 
     let ctx = TestContext::new(Arc::clone(&bc));
     let ctx = Arc::new(Mutex::new(ctx));
@@ -497,7 +499,7 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, reliable : bool) {
             // IMPORTANT: it seems that setting this to a long delay
             // prevents SN from recovering. Could be because they miss
             // a few block updates
-            if !reliable {
+            if !opt.reliableSnodes {
                 ctx.restart_snode(1000);
             }
         }
@@ -527,72 +529,6 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, reliable : bool) {
 
     ctx.lock().unwrap().print_stats();
     ctx.lock().unwrap().check_messages();
-
-}
-
-/// Consider removing this in favour of test_blocks
-#[allow(dead_code)]
-pub fn large_test(bc: &Arc<Mutex<Blockchain>>) {
-
-    let mut rng = StdRng::seed_from_u64(0);
-
-    // start with a limited pool of public keys
-    let pks = [
-        "ef57493cd18b632c7d4351f1bc91c23f62f933479e9fd5a976a6f2912edf71a3",
-        "f63ca4260ffae0512e4f9f84435d7d76e41609d1ccf61507d67f9337c36c11a8",
-        "1efe23d3a5445abe6f7a74c0601f352699d82a33020defa8c6f72f9cd1d403d3",
-        "ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351",
-        "648763a60ef63e49988a3e3934338745ff45d6b8410181eab58caf92ec97ae27",
-    ];
-
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
-
-    ctx.lock().unwrap().add_swarm(3);
-
-    let ctx_clone = ctx.clone();
-
-    let node_thread = std::thread::spawn(move || {
-
-        for i in 0..100 {
-        // create a node every second
-            sleep_ms(1000);
-
-            let num = rng.gen_range(5, 10);
-            if ctx_clone.lock().unwrap().snode_count() > num {
-                ctx_clone.lock().unwrap().drop_snode();
-            }
-
-            ctx_clone.lock().unwrap().add_snode();
-        }
-    });
-
-    let ctx_clone = ctx.clone();
-
-    let message_thread = std::thread::spawn(move || {
-
-        let mut rng = StdRng::seed_from_u64(0);
-
-        sleep_ms(50);
-
-        for _ in 0..2000 {
-            // give SNs some time to initialize their servers
-            sleep_ms(50);
-
-            let pk = pks.choose(&mut rng).unwrap();
-
-            ctx_clone.lock().unwrap().send_random_message_to_pk(&pk);
-        };
-
-    });
-
-    node_thread.join().unwrap();
-    message_thread.join().unwrap();
-
-    sleep_ms(2000);
-
-    ctx.lock().unwrap().check_messages();
-
 
 }
 

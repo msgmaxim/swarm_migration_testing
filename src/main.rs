@@ -21,7 +21,7 @@ use swarms::*;
 use rpc_server::Blockchain;
 use std::sync::{Arc, Mutex};
 
-fn print_sn_data(sm: &SwarmManager, swarm: &Swarm) {
+fn print_sn_data(swarm: &Swarm) {
     for sn in &swarm.nodes {
         println!("[{}]", &sn.ip);
 
@@ -33,48 +33,27 @@ fn print_sn_data(sm: &SwarmManager, swarm: &Swarm) {
     }
 }
 
-fn send_req_to_purge(sn: &ServiceNode) {
-    let target = "/purge";
-    let addr = "http://localhost:".to_owned() + &sn.ip + target;
-
-    let client = reqwest::Client::new();
-
-    if let Err(_) = client.post(&addr).send() {
-        error!("could not send /purge request to a node at {}", &sn.ip);
-    } else {
-        warn!("purging {}", &sn.ip);
-    }
-}
-
-fn send_req_to_quit(sn: &ServiceNode) {
+fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
     let target = "/quit";
     let addr = "http://localhost:".to_owned() + &sn.ip + target;
 
     let client = reqwest::Client::new();
 
-    if let Err(_) = client.post(&addr).send() {
+    if let Err(_e) = client.post(&addr).send() {
         error!("could not send /quit request to a node at {}", &sn.ip);
+        Err(())
     } else {
         warn!("quitting {}", &sn.ip);
+        Ok(())
     }
 }
 
 fn gracefully_exit(bc: &Arc<Mutex<Blockchain>>) {
     let sm = &mut bc.lock().unwrap().swarm_manager;
-    print!("Quitting {} nodes...", sm.children.len());
-    for sn in sm.swarms.iter() {
-        for node in sn.nodes.iter() {
-            send_req_to_quit(&node);
-        }
-    }
 
-    for sn in sm.children.iter_mut() {
-        sn.wait().unwrap();
-    }
+    sm.quit_children();
 
-    println!("done");
-
-    // Not sure how to stop rpc tqhe server,
+    // Not sure how to stop rpc the server,
     // or whether that is even necessary
     std::process::exit(0);
 }
@@ -117,11 +96,17 @@ fn main() {
     // tests::single_node_one_message(&blockchain);
     // tests::single_swarm_one_message(&blockchain);
     // tests::sinlge_swarm_joined(&blockchain);
+    // tests::multiple_swarms_static(&blockchain);
     // tests::test_dissolving(&blockchain);
     // tests::test_retry_batches(&blockchain);
     // tests::test_retry_singles(&blockchain);
-    // tests::large_test(&blockchain);
-    // tests::test_blocks(&blockchain, true);
+
+
+    let options = tests::TestOptions {
+        reliableSnodes : false
+    };
+
+    tests::test_blocks(&blockchain, &options);
 
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
@@ -135,22 +120,12 @@ fn main() {
             break;
         }
 
-        if command == "purge" {
-            println!("purging...");
-
-            for sn in blockchain.lock().unwrap().swarm_manager.swarms.iter() {
-                for node in sn.nodes.iter() {
-                    send_req_to_purge(&node);
-                }
-            }
-        }
-
         if command == "test" {
             let sm = &blockchain.lock().unwrap().swarm_manager;
 
             for s in &sm.swarms {
                 println!("          ___swarm {}___", s.swarm_id);
-                print_sn_data(&sm, s);
+                print_sn_data(s);
             }
         }
 

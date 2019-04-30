@@ -2,9 +2,10 @@ use rand::prelude::*;
 use rand::seq::SliceRandom;
 use std::fmt::{self, Debug};
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
+
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceNode {
-    pub ip: String,
+    pub ip: String
 }
 
 #[derive(Serialize, Clone)]
@@ -31,7 +32,7 @@ pub struct Stats {
 
 pub struct SwarmManager {
     pub swarms: Vec<Swarm>,
-    pub children: Vec<std::process::Child>,
+    sn_to_child: std::collections::HashMap<ServiceNode, std::process::Child>,
     pub stats : Stats,
     rng : StdRng,
 }
@@ -116,8 +117,8 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg("0.0.0.0");
     server_process.arg(sn.ip.to_string());
     server_process.arg("--log-level");
-    server_process.arg("trace");
-    // server_process.arg("debug");
+    // server_process.arg("trace");
+    server_process.arg("debug");
 
     match server_process.spawn() {
         Ok(child) => Some(child),
@@ -137,7 +138,7 @@ impl SwarmManager {
     pub fn new() -> SwarmManager {
         SwarmManager {
             swarms: vec![],
-            children: vec![],
+            sn_to_child : std::collections::HashMap::new(),
             stats: Stats { dissolved: 0 },
             rng : StdRng::seed_from_u64(1)
         }
@@ -152,7 +153,7 @@ impl SwarmManager {
         }
 
         self.swarms.clear();
-        self.children.clear();
+        self.sn_to_child.clear();
         self.stats.dissolved = 0;
         self.rng = StdRng::seed_from_u64(1);
 
@@ -171,7 +172,7 @@ impl SwarmManager {
         for node in &nodes {
             if let Some(child) = spawn_service_node(&node) {
                 warn!("NEW SNODE: {}", &node.ip);
-                self.children.push(child);
+                self.sn_to_child.insert(node.clone(), child);
             } else {
                 error!("Could not spawn node!");
             }
@@ -291,9 +292,17 @@ impl SwarmManager {
 
         let snode = swarm.nodes.choose(&mut self.rng).unwrap();
 
-        crate::send_req_to_quit(snode);
+        match crate::send_req_to_quit(snode) {
+            Ok(()) => {
+                self.sn_to_child.remove(&snode).expect("child entry did not exist");
+            },
+            Err(()) => {
+                eprintln!("could not quit snode");
+            }
+        }
 
         warn!("disconnected snode: {}", snode.ip);
+        println!("disconnected snode: {}", snode.ip);
 
         snode.clone()
     }
@@ -308,8 +317,6 @@ impl SwarmManager {
         let node = swarm.nodes.remove(node_idx);
 
         warn!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
-
-        crate::send_req_to_quit(&node);
 
         // ==== Try to steal from existing swarms ====
         if swarm.nodes.len() >= MIN_SWARM_SIZE {
@@ -360,7 +367,7 @@ impl SwarmManager {
         // TODO: check that snode actually exists
         warn!("Restore SNODE: {}", &sn.ip);
         let child = spawn_service_node(&sn).expect("error spawning a service node");
-        self.children.push(child);
+        self.sn_to_child.insert(sn.clone(), child);
 
         // Note: we don't apply any swarm changes since
         // we haven't properly deregistered in the first place
@@ -375,7 +382,7 @@ impl SwarmManager {
         match spawn {
             SpawnStrategy::Now => {
                 let child = spawn_service_node(&sn).expect("error spawning a service node");
-                self.children.push(child);
+                self.sn_to_child.insert(sn.clone(), child);
             }
             SpawnStrategy::Later => {
                 info!("SN will be registered now, but instantiated later");
@@ -422,9 +429,22 @@ impl SwarmManager {
     pub fn create_snode(&mut self, sn: ServiceNode, swarm_idx: usize) {
         warn!("NEW SNODE: {}", &sn.ip);
         let child = spawn_service_node(&sn).expect("error spawning a service node");
-        self.children.push(child);
+        self.sn_to_child.insert(sn.clone(), child);
 
         // TODO: use loki rules to determine where the node should go
         self.swarms[swarm_idx].nodes.push(sn);
+    }
+
+    pub fn quit_children(&mut self) {
+
+        /// NOTE: some of these nodes are not running anymore
+        print!("Quitting {} nodes...", self.sn_to_child.len());
+        for (sn, child) in &mut self.sn_to_child {
+            let _ = crate::send_req_to_quit(&sn);
+            child.wait().unwrap();
+        }
+
+        println!("done");
+
     }
 }

@@ -215,6 +215,10 @@ impl TestContext {
         self.bad_snodes.push(sn);
     }
 
+    pub fn dissolve_swarm(&mut self, swarm_idx : usize) {
+        self.bc.lock().unwrap().swarm_manager.dissolve_swarm(swarm_idx);
+    }
+
     pub fn restart_snode(&mut self, delay_ms: u64) {
         let sn = self.bc.lock().unwrap().swarm_manager.disconnect_snode();
 
@@ -227,6 +231,9 @@ impl TestContext {
 
         let t = std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+
+            // TODO: need to check if the node has been dropped already
+            // with tests, so there is no need to restore the node
             bc_copy.lock().unwrap().swarm_manager.restore_snode(&sn);
         });
     }
@@ -251,6 +258,8 @@ impl TestContext {
         &self.bc.lock().unwrap().swarm_manager.add_swarm(&ports);
     }
 
+    // TODO: ensure that we call this atomically with corresponding
+    // swarm changes
     pub fn inc_block_height(&mut self) {
         let mut bc = &mut self.bc.lock().unwrap();
         bc.height += 1;
