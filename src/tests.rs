@@ -1,5 +1,6 @@
 
 use std::sync::{Mutex, Arc};
+use std::sync::atomic::{AtomicBool, Ordering};
 use crate::test_context::TestContext;
 use crate::rpc_server::Blockchain;
 use crate::swarms::PubKey;
@@ -440,7 +441,8 @@ fn gen_rand_pubkeys(n : u32, mut rng : &mut StdRng) -> Vec<PubKey> {
 
 
 pub struct TestOptions {
-    pub reliableSnodes : bool
+    pub reliable_snodes : bool,
+    pub duration : std::time::Duration
 }
 
 /// `reliable` determines whether nodes can disconnect from time
@@ -457,24 +459,35 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
 
     ctx.lock().unwrap().add_swarm(3);
 
-    let running = Arc::new(Mutex::new(true));
+    let running_flag = Arc::new(AtomicBool::new(true));
 
     let ctx_clone = ctx.clone();
     let mut rng_clone = rng.clone();
-    let running_clone = running.clone();
+    let running = running_flag.clone();
+
+    let duration = opt.duration;
+    // TODO: use a timer instead
+    let timer_thread = std::thread::spawn(move || {
+
+        std::thread::sleep(duration);
+        running.store(false, Ordering::SeqCst);
+    });
+
+    let running = running_flag.clone();
+
     // Spawn a thread for messages
     let message_thread = std::thread::spawn(move || {
 
-        for _ in 0..1000 {
+        for _ in 0.. {
             // give SNs some time to initialize their servers
             sleep_ms(50);
 
             let pk = pks.choose(&mut rng_clone).unwrap();
 
             ctx_clone.lock().unwrap().send_random_message_to_pk(&pk.to_string());
-        };
 
-        *running_clone.lock().unwrap() = false;
+            if !running.load(Ordering::SeqCst) { break; }
+        };
 
     });
 
@@ -499,7 +512,7 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
             // IMPORTANT: it seems that setting this to a long delay
             // prevents SN from recovering. Could be because they miss
             // a few block updates
-            if !opt.reliableSnodes {
+            if !opt.reliable_snodes {
                 ctx.restart_snode(1000);
             }
         }
@@ -519,7 +532,7 @@ pub fn test_blocks(bc : &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
         // release the lock
         drop(ctx);
 
-        if !*running.lock().unwrap() { break; }
+        if !running_flag.load(Ordering::SeqCst) { break; }
 
     }
 

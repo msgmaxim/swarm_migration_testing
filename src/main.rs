@@ -103,7 +103,8 @@ fn main() {
 
 
     let options = tests::TestOptions {
-        reliableSnodes : false
+        reliable_snodes: false,
+        duration : std::time::Duration::from_secs(5)
     };
 
     tests::test_blocks(&blockchain, &options);
