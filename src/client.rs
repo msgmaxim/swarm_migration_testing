@@ -109,11 +109,13 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
 
     let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
 
+    let ttl = "86400000".to_owned(); // 1 day
+
     let msg = StoreBody {
         method: "store".to_owned(),
         params: StoreArgs {
             pubKey: pk.clone(),
-            ttl: "86400".to_owned(),
+            ttl,
             nonce: "324324".to_owned(),
             timestamp: timestamp.to_string(),
             data: msg.to_owned(),
@@ -206,7 +208,7 @@ pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) 
     let req = client
         .post(&addr)
         .header("X-Loki-ephemkey", "86400")
-        .header("x-loki-long-poll", "")
+        // .header("x-loki-long-poll", "")
         .body(msg);
 
     match req.send() {

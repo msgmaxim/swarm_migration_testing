@@ -58,6 +58,11 @@ fn gracefully_exit(bc: &Arc<Mutex<Blockchain>>) {
     std::process::exit(0);
 }
 
+fn from_mins(mins : u64) -> std::time::Duration {
+    let secs = mins * 60;
+    std::time::Duration::from_secs(secs)
+}
+
 fn main() {
     // Overwrite logs with every run
     let path = std::path::Path::new("log");
@@ -89,7 +94,11 @@ fn main() {
     .expect("error handling Ctrl+C handler");
 
     // tests::async_test(&blockchain);
+
+    // Note: when testing long-polling, need to
+    // modify client request to use the right header
     // tests::long_polling(&blockchain);
+
     // tests::one_node_big_data(&blockchain);
     // tests::test_bootstrapping_peer_big_data(&blockchain);
     // tests::test_bootstrapping_swarm_big_data(&blockchain);
@@ -101,10 +110,20 @@ fn main() {
     // tests::test_retry_batches(&blockchain);
     // tests::test_retry_singles(&blockchain);
 
+    // Note: currently the test works fine to 15 minutes
 
     let options = tests::TestOptions {
-        reliable_snodes: false,
-        duration : std::time::Duration::from_secs(5)
+        reliable_snodes: true,
+        duration : std::time::Duration::from_secs(20),
+        block_interval : std::time::Duration::from_secs(2),
+        message_interval : std::time::Duration::from_millis(50),
+    };
+
+    let long_test_opt = tests::TestOptions {
+        reliable_snodes: true,
+        duration: from_mins(15),
+        block_interval: std::time::Duration::from_secs(10),
+        message_interval: std::time::Duration::from_millis(50),
     };
 
     tests::test_blocks(&blockchain, &options);

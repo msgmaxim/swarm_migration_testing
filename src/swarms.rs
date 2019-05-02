@@ -307,22 +307,14 @@ impl SwarmManager {
         snode.clone()
     }
 
-    /// Drop one random snode
-    pub fn drop_snode(&mut self) {
+    fn handle_dropped(&mut self, swarm_idx : usize, node : ServiceNode) {
 
-        let swarm_idx = self.rng.gen_range(0, self.swarms.len());
-        let swarm = &mut self.swarms[swarm_idx];
-
-        let node_idx = self.rng.gen_range(0, swarm.nodes.len());
-        let node = swarm.nodes.remove(node_idx);
-
-        warn!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
-
-        // ==== Try to steal from existing swarms ====
+        let swarm = &self.swarms[swarm_idx];
         if swarm.nodes.len() >= MIN_SWARM_SIZE {
             return;
         }
 
+        // ==== Try to steal from existing swarms ====
         let mut big_swarms: Vec<Swarm> = self.swarms.iter().filter(|s| s.nodes.len() > MIN_SWARM_SIZE ).cloned().collect();
 
         info!("Have {} swarms to steal from", big_swarms.len());
@@ -360,6 +352,25 @@ impl SwarmManager {
             // dissolve the swarm
             self.dissolve_swarm(swarm_idx);
         }
+
+    }
+
+    /// Drop one random snode
+    /// TODO: only drop nodes from swarms that have at least 3 nodes
+    pub fn drop_snode(&mut self) {
+
+        let swarm_idx = self.rng.gen_range(0, self.swarms.len());
+        let swarm = &mut self.swarms[swarm_idx];
+
+        let node_idx = self.rng.gen_range(0, swarm.nodes.len());
+        let node = swarm.nodes.remove(node_idx);
+
+        let _ = crate::send_req_to_quit(&node);
+        self.sn_to_child.remove(&node).expect("child entry did not exist");
+
+        warn!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
+
+        self.handle_dropped(swarm_idx, node);
     }
 
     pub fn restore_snode(&mut self, sn : &ServiceNode) {
