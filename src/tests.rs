@@ -283,7 +283,7 @@ pub fn sinlge_swarm_joined(bc: &Arc<Mutex<Blockchain>>) {
     ctx.add_snode();
     ctx.inc_block_height();
 
-    sleep_ms(2000);
+    sleep_ms(3000);
 
     ctx.check_messages();
 }
@@ -517,7 +517,7 @@ fn generate_blocks(
     // Every iteration in this loop corresponds to a block
     for i in 0.. {
         println!("iteration: {}", i);
-        warn!("iteration: {}", i);
+        info!("iteration: {}", i);
         // how much to wait until the next block
         // let ms = rng.gen_range(500, 2000);
         std::thread::sleep(opt.block_interval);
@@ -691,34 +691,53 @@ fn test_tokio() {
 
 #[allow(dead_code)]
 fn test_small_random(bc: &Arc<Mutex<Blockchain>>) {
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
-    ctx.lock().unwrap().add_swarm(3);
+    ctx.add_swarm(3);
 
-    let ctx_clone = ctx.clone();
+    sleep_ms(1000);
+    ctx.add_snode();
 
-    let node_thread = std::thread::spawn(move || {
-        sleep_ms(1000);
-        ctx_clone.lock().unwrap().add_snode();
+    ctx.send_random_message();
+    sleep_ms(100);
+    ctx.send_random_message();
+    sleep_ms(100);
+    ctx.send_random_message();
+    sleep_ms(100);
 
-        ctx_clone.lock().unwrap().send_random_message();
-        sleep_ms(100);
-        ctx_clone.lock().unwrap().send_random_message();
-        sleep_ms(100);
-        ctx_clone.lock().unwrap().send_random_message();
-        sleep_ms(100);
+    ctx.drop_snode();
 
-        ctx_clone.lock().unwrap().drop_snode();
-
-        ctx_clone.lock().unwrap().add_snode();
-        ctx_clone.lock().unwrap().add_snode();
-        ctx_clone.lock().unwrap().add_snode();
-    });
-
-    node_thread.join().unwrap();
+    ctx.add_snode();
+    ctx.add_snode();
+    ctx.add_snode();
 
     sleep_ms(2000);
 
-    ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
+}
+
+/// 2. Test adding an additional snode to a swarm
+#[allow(dead_code)]
+pub fn peer_testing(bc: &Arc<Mutex<Blockchain>>) {
+    let mut ctx = TestContext::new(Arc::clone(&bc));
+
+    ctx.add_swarm(5);
+
+    sleep_ms(300);
+
+    for _ in 0..10 {
+        ctx.send_random_message();
+    }
+
+    sleep_ms(300);
+
+    for _ in 0..3 {
+        // new block every 1s
+        sleep_ms(1000);
+        ctx.inc_block_height();
+    }
+
+    sleep_ms(3000);
+
+    ctx.check_messages();
 }

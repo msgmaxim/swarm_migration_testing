@@ -300,12 +300,10 @@ pub fn send_message_to_pk(sm: &SwarmManager, pk_str: &str, msg: &str) -> Result<
 
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
-    warn!("about to send message");
-
     let res = send_message(&sn.ip, &pk_str, &msg);
 
     if res.is_ok() {
-        warn!("sent msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.ip, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
+        debug!("sent msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.ip, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
     } else {
         error!("could not send msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.ip, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
     }
@@ -328,7 +326,7 @@ pub fn barrage_messages(port: &str) {
 
         let fut = client.request(req).map(|_|{
             println!("It's a success!");
-        }).map_err(|err| {
+        }).map_err(|_err| {
 
         });
 
@@ -360,7 +358,7 @@ pub fn send_random_message(sm: &SwarmManager, mut rng : &mut StdRng) -> Result<(
     let res = send_message(&sn.ip, &pk_str, &msg);
 
     if res.is_ok() {
-        println!("sending random message <{}> to {} to sn {} from swarm {}", msg, pk_str, &sn.ip, swarm_idx);
+        info!("sending random message <{}> to {} to sn {} from swarm {}", msg, pk_str, &sn.ip, swarm_idx);
         return Ok((pk_str.to_owned(), msg.to_owned()));
     }
 

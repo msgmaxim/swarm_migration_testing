@@ -125,13 +125,13 @@ impl TestContext {
                 if self.bad_snodes.contains(&sn) {
                     continue;
                 };
-                warn!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.ip);
+                info!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.ip);
 
                 let got_msgs = client::request_messages(&sn, key);
                 let got_msgs: Vec<String> = got_msgs.iter().map(|x| x.data.clone()).collect();
 
                 if expect_msgs.len() != got_msgs.len() {
-                    error!(
+                    warn!(
                         "wrong number of messages for pk: {}, exepcted {}, got {}",
                         key,
                         expect_msgs.len(),
@@ -143,8 +143,8 @@ impl TestContext {
                     messages_tested += 1;
 
                     if !got_msgs.contains(&msg) {
-                        error!("message lost: {}", &msg);
-                        error!("only got: {:?}", &got_msgs);
+                        warn!("message lost: {}", &msg);
+                        warn!("only got: {:?}", &got_msgs);
                         lost_count += 1;
                     };
                 }
@@ -261,7 +261,6 @@ impl TestContext {
     // TODO: ensure that we call this atomically with corresponding
     // swarm changes
     pub fn inc_block_height(&mut self) {
-        let mut bc = &mut self.bc.lock().unwrap();
-        bc.height += 1;
+        self.bc.lock().unwrap().inc_block_height();
     }
 }

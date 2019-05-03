@@ -43,7 +43,7 @@ fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
         error!("could not send /quit request to a node at {}", &sn.ip);
         Err(())
     } else {
-        warn!("quitting {}", &sn.ip);
+        info!("quitting {}", &sn.ip);
         Ok(())
     }
 }
@@ -93,6 +93,22 @@ fn main() {
     })
     .expect("error handling Ctrl+C handler");
 
+        // Note: currently the test works fine to 15 minutes
+
+    let options = tests::TestOptions {
+        reliable_snodes: true,
+        duration : std::time::Duration::from_secs(20),
+        block_interval : std::time::Duration::from_secs(2),
+        message_interval : std::time::Duration::from_millis(50),
+    };
+
+    let long_test_opt = tests::TestOptions {
+        reliable_snodes: true,
+        duration: from_mins(45),
+        block_interval: std::time::Duration::from_secs(10),
+        message_interval: std::time::Duration::from_millis(50),
+    };
+
     // tests::async_test(&blockchain);
 
     // Note: when testing long-polling, need to
@@ -109,24 +125,9 @@ fn main() {
     // tests::test_dissolving(&blockchain);
     // tests::test_retry_batches(&blockchain);
     // tests::test_retry_singles(&blockchain);
-
-    // Note: currently the test works fine to 15 minutes
-
-    let options = tests::TestOptions {
-        reliable_snodes: true,
-        duration : std::time::Duration::from_secs(20),
-        block_interval : std::time::Duration::from_secs(2),
-        message_interval : std::time::Duration::from_millis(50),
-    };
-
-    let long_test_opt = tests::TestOptions {
-        reliable_snodes: true,
-        duration: from_mins(15),
-        block_interval: std::time::Duration::from_secs(10),
-        message_interval: std::time::Duration::from_millis(50),
-    };
-
+    // tests::peer_testing(&blockchain);
     tests::test_blocks(&blockchain, &options);
+
 
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();

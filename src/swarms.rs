@@ -162,7 +162,7 @@ impl SwarmManager {
     pub fn add_swarm<'a>(&mut self, nodes: &[u16]) {
         let swarm_id = self.get_next_swarm_id();
 
-        warn!("using {} as swarm id", swarm_id);
+        info!("using {} as swarm id", swarm_id);
 
         let nodes: Vec<ServiceNode> = nodes
             .iter()
@@ -171,7 +171,7 @@ impl SwarmManager {
 
         for node in &nodes {
             if let Some(child) = spawn_service_node(&node) {
-                warn!("NEW SNODE: {}", &node.ip);
+                info!("NEW SNODE: {}", &node.ip);
                 self.sn_to_child.insert(node.clone(), child);
             } else {
                 error!("Could not spawn node!");
@@ -185,10 +185,10 @@ impl SwarmManager {
 
     pub fn dissolve_swarm(&mut self, idx : usize) {
 
-        warn!("dissolving swarm: {}", self.swarms[idx].swarm_id);
+        info!("dissolving swarm: {}", self.swarms[idx].swarm_id);
 
         if self.swarms.len() == 1 {
-            error!("Would dissolve the last swarm. Keeping it alive instead.");
+            warn!("Would dissolve the last swarm. Keeping it alive instead.");
             return;
         }
 
@@ -301,7 +301,7 @@ impl SwarmManager {
             }
         }
 
-        warn!("disconnected snode: {}", snode.ip);
+        info!("disconnected snode: {}", snode.ip);
         println!("disconnected snode: {}", snode.ip);
 
         snode.clone()
@@ -317,7 +317,7 @@ impl SwarmManager {
         // ==== Try to steal from existing swarms ====
         let mut big_swarms: Vec<Swarm> = self.swarms.iter().filter(|s| s.nodes.len() > MIN_SWARM_SIZE ).cloned().collect();
 
-        info!("Have {} swarms to steal from", big_swarms.len());
+        trace!("Have {} swarms to steal from", big_swarms.len());
 
         if big_swarms.len() > 0 {
             let mut big_swarm = big_swarms.choose_mut(&mut self.rng).unwrap();
@@ -346,7 +346,7 @@ impl SwarmManager {
             }
 
             let swarm = &mut self.swarms[swarm_idx];
-            warn!("moved snode {} from swarm {} to {}", &node.ip, &big_swarm.swarm_id, &swarm.swarm_id);
+            trace!("moved snode {} from swarm {} to {}", &node.ip, &big_swarm.swarm_id, &swarm.swarm_id);
             swarm.nodes.push(mov_node);
         } else {
             // dissolve the swarm
@@ -368,7 +368,7 @@ impl SwarmManager {
         let _ = crate::send_req_to_quit(&node);
         self.sn_to_child.remove(&node).expect("child entry did not exist");
 
-        warn!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
+        info!("dropping snode {} from swarm {}", &node.ip, &swarm.swarm_id);
 
         self.handle_dropped(swarm_idx, node);
     }
@@ -376,7 +376,7 @@ impl SwarmManager {
     pub fn restore_snode(&mut self, sn : &ServiceNode) {
 
         // TODO: check that snode actually exists
-        warn!("Restore SNODE: {}", &sn.ip);
+        info!("Restore SNODE: {}", &sn.ip);
         let child = spawn_service_node(&sn).expect("error spawning a service node");
         self.sn_to_child.insert(sn.clone(), child);
 
@@ -389,28 +389,28 @@ impl SwarmManager {
     pub fn add_snode(&mut self, sn : &ServiceNode, spawn: SpawnStrategy) {
 
 
-        warn!("NEW SNODE: {}", &sn.ip);
+        info!("NEW SNODE: {}", &sn.ip);
         match spawn {
             SpawnStrategy::Now => {
                 let child = spawn_service_node(&sn).expect("error spawning a service node");
                 self.sn_to_child.insert(sn.clone(), child);
             }
             SpawnStrategy::Later => {
-                info!("SN will be registered now, but instantiated later");
+                info!(" - it will be registered now, but instantiated later");
             }
         }
 
         // Figure out which swarm this node is to join
         let mut rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
 
-        info!("choosing swarm: {}", rand_swarm.swarm_id);
+        trace!("choosing swarm: {}", rand_swarm.swarm_id);
 
         rand_swarm.nodes.push(sn.clone());
 
         // See if we need to make a new swarm
         let total_extra = self.swarms.iter().fold(0, |sum, x| if x.nodes.len() > MIN_SWARM_SIZE { sum + x.nodes.len() - MIN_SWARM_SIZE} else { sum } );
 
-        info!("total extra: {}", total_extra);
+        trace!("total extra: {}", total_extra);
 
         if total_extra > MIN_SWARM_SIZE {
             // create new swarm
@@ -431,14 +431,14 @@ impl SwarmManager {
             let swarm_id = self.get_next_swarm_id();
             let swarm = Swarm { swarm_id, nodes : nodes_to_move };
             self.swarms.push(swarm);
-            warn!("using {} as swarm id", swarm_id);
+            trace!("using {} as swarm id", swarm_id);
 
         }
 
     }
 
     pub fn create_snode(&mut self, sn: ServiceNode, swarm_idx: usize) {
-        warn!("NEW SNODE: {}", &sn.ip);
+        info!("NEW SNODE: {}", &sn.ip);
         let child = spawn_service_node(&sn).expect("error spawning a service node");
         self.sn_to_child.insert(sn.clone(), child);
 

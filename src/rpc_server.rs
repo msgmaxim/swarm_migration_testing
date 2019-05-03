@@ -1,12 +1,14 @@
-pub struct Blockchain {
-    pub swarm_manager: SwarmManager,
-    pub height : u64
-}
-
 use std::sync::{Arc, Mutex};
 
 use crate::swarms::*;
 use std::fmt::{self, Debug, Display};
+use rand::prelude::*;
+
+pub struct Blockchain {
+    pub swarm_manager: SwarmManager,
+    height : u64,
+    block_hash : String,
+}
 
 impl Display for Blockchain {
 
@@ -52,7 +54,8 @@ struct ServiceNodeSwarmData {
 #[derive(Serialize)]
 struct SwarmResult {
     service_node_states : Vec<ServiceNodeSwarmData>,
-    height : u64
+    height : u64,
+    block_hash : String
 }
 
 #[derive(Serialize)]
@@ -60,12 +63,24 @@ struct SwarmResponse {
     result : SwarmResult
 }
 
+fn gen_random_hash() -> String {
+
+    let n1 = rand::thread_rng().gen::<u64>();
+    let n2 = rand::thread_rng().gen::<u64>();
+    let n3 = rand::thread_rng().gen::<u64>();
+    let n4 = rand::thread_rng().gen::<u64>();
+
+    format!("{:016x}{:016x}{:016x}{:016x}", n1, n2, n3, n4)
+
+}
+
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
 
         // 0 is used to indicate that SN haven't synced yet
         let height = 1;
-        Blockchain { swarm_manager, height }
+        let block_hash =  gen_random_hash();
+        Blockchain { swarm_manager, height, block_hash }
     }
 
     pub fn reset(&mut self) {
@@ -84,7 +99,7 @@ impl Blockchain {
 
         let service_node_states = sn_list;
 
-        let response = SwarmResponse { result : SwarmResult { service_node_states, height: self.height } };
+        let response = SwarmResponse { result : SwarmResult { service_node_states, height: self.height, block_hash: self.block_hash.clone() } };
 
         serde_json::to_string(&response).expect("could not construct json")
     }
@@ -93,7 +108,7 @@ impl Blockchain {
         let mut res = String::new();
 
         if let Some(Some(method)) = val.get("method").map(|v| v.as_str()) {
-            info!("method is: {:?}", &method);
+            trace!("got json rcp request, method: {:?}", &method);
 
             match method {
                 "get_service_nodes" => {
@@ -108,9 +123,12 @@ impl Blockchain {
             }
         }
 
-        warn!("{}", &res);
-
         res
+    }
+
+    pub fn inc_block_height(&mut self) {
+        self.height += 1;
+        self.block_hash = gen_random_hash();
     }
 }
 
