@@ -41,14 +41,9 @@ impl Debug for Blockchain {
 }
 
 #[derive(Serialize)]
-struct ServiceNodeInfo {
-    swarm_id : u64
-}
-
-#[derive(Serialize)]
 struct ServiceNodeSwarmData {
-    pubkey : String,
-    info : ServiceNodeInfo,
+    service_node_pubkey : String,
+    swarm_id : u64,
 }
 
 #[derive(Serialize)]
@@ -93,7 +88,7 @@ impl Blockchain {
 
         for swarm in &self.swarm_manager.swarms {
             for sn in &swarm.nodes {
-                sn_list.push( ServiceNodeSwarmData{ pubkey : sn.ip.clone(), info : ServiceNodeInfo { swarm_id : swarm.swarm_id } } )
+                sn_list.push( ServiceNodeSwarmData{ service_node_pubkey : sn.ip.clone(), swarm_id : swarm.swarm_id } )
             }
         }
 
