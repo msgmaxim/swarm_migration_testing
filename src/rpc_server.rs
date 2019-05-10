@@ -41,14 +41,14 @@ impl Debug for Blockchain {
 }
 
 #[derive(Serialize)]
-struct ServiceNodeSwarmData {
+struct ServiceNodeState {
     service_node_pubkey : String,
     swarm_id : u64,
 }
 
 #[derive(Serialize)]
 struct SwarmResult {
-    service_node_states : Vec<ServiceNodeSwarmData>,
+    service_node_states : Vec<ServiceNodeState>,
     height : u64,
     block_hash : String
 }
@@ -88,7 +88,9 @@ impl Blockchain {
 
         for swarm in &self.swarm_manager.swarms {
             for sn in &swarm.nodes {
-                sn_list.push( ServiceNodeSwarmData{ service_node_pubkey : sn.ip.clone(), swarm_id : swarm.swarm_id } )
+                let service_node_pubkey = sn.ip.clone();
+                let swarm_id = swarm.swarm_id;
+                sn_list.push( ServiceNodeState { service_node_pubkey, swarm_id } )
             }
         }
 
@@ -153,9 +155,9 @@ pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::Jo
             Ok(final_res)
         });
 
-        println!("starting RPC server on port 38157...");
+        println!("starting RPC server on port 22023...");
 
-        server.listen("0.0.0.0", "38157");
+        server.listen("0.0.0.0", "22023");
 
     });
 
