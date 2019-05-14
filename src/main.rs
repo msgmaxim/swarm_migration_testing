@@ -23,9 +23,9 @@ use std::sync::{Arc, Mutex};
 
 fn print_sn_data(swarm: &Swarm) {
     for sn in &swarm.nodes {
-        println!("[{}]", &sn.ip);
+        println!("[{}]", &sn.port);
 
-        let messages = client::request_all_messages(&sn.ip);
+        let messages = client::request_all_messages(&sn.port);
 
         for msg in messages {
             println!("  {} {}", msg.pk, msg.data);
@@ -35,15 +35,15 @@ fn print_sn_data(swarm: &Swarm) {
 
 fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
     let target = "/quit";
-    let addr = "http://localhost:".to_owned() + &sn.ip + target;
+    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
     let client = reqwest::Client::new();
 
     if let Err(_e) = client.post(&addr).send() {
-        error!("could not send /quit request to a node at {}", &sn.ip);
+        error!("could not send /quit request to a node at {}", &sn.port);
         Err(())
     } else {
-        info!("quitting {}", &sn.ip);
+        info!("quitting {}", &sn.port);
         Ok(())
     }
 }
@@ -104,7 +104,7 @@ fn main() {
 
     let long_test_opt = tests::TestOptions {
         reliable_snodes: true,
-        duration: from_mins(45),
+        duration: from_mins(5),
         block_interval: std::time::Duration::from_secs(10),
         message_interval: std::time::Duration::from_millis(50),
     };

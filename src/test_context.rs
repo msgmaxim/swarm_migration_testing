@@ -1,4 +1,5 @@
 use crate::rpc_server::Blockchain;
+use crate::rpc_server::KeyPair;
 
 use rand::prelude::*;
 use std::collections::HashMap;
@@ -125,7 +126,7 @@ impl TestContext {
                 if self.bad_snodes.contains(&sn) {
                     continue;
                 };
-                info!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.ip);
+                info!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.port);
 
                 let got_msgs = client::request_messages(&sn, key);
                 let got_msgs: Vec<String> = got_msgs.iter().map(|x| x.data.clone()).collect();
@@ -176,7 +177,11 @@ impl TestContext {
         // find available port starting with 5904
         for i in (self.latest_port + 1)..7000 {
             if is_port_available(i) {
-                let sn = ServiceNode { ip: i.to_string() };
+                // let keypair = self.bc.lock().unwrap();
+                let port = i.to_string();
+
+                let keypair = self.bc.lock().unwrap().pop_keypair();
+                let sn = ServiceNode::new(port, keypair.pubkey.clone(), keypair.seckey.clone());
                 self.bc.lock().unwrap().swarm_manager.add_snode(&sn, spawn);
 
                 res = Some(sn);
@@ -222,8 +227,8 @@ impl TestContext {
     pub fn restart_snode(&mut self, delay_ms: u64) {
         let sn = self.bc.lock().unwrap().swarm_manager.disconnect_snode();
 
-        println!("restarted snode: {}", sn.ip);
-        info!("restarted snode: {}", sn.ip);
+        println!("restarted snode: {}", sn.port);
+        info!("restarted snode: {}", sn.port);
 
         // connect again after a short time
 
@@ -243,11 +248,15 @@ impl TestContext {
     }
 
     pub fn add_swarm<'a>(&mut self, n: usize) {
-        let mut ports: Vec<u16> = vec![];
+
+        let mut bc = self.bc.lock().unwrap();
+        let mut ports: Vec<(u16, KeyPair)> = vec![];
 
         for i in (self.latest_port + 1)..7000 {
             if is_port_available(i) {
-                ports.push(i);
+
+                let keypair = bc.pop_keypair();
+                ports.push((i, keypair));
                 if ports.len() >= n {
                     self.latest_port = i;
                     break;
@@ -255,7 +264,7 @@ impl TestContext {
             }
         }
 
-        &self.bc.lock().unwrap().swarm_manager.add_swarm(&ports);
+        bc.swarm_manager.add_swarm(&ports);
     }
 
     // TODO: ensure that we call this atomically with corresponding

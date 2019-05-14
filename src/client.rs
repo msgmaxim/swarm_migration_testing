@@ -188,7 +188,7 @@ pub fn request_messages(sn: &ServiceNode, pk: &str) -> Vec<MessageResponse> {
 pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) -> Vec<MessageResponse> {
 
     let target = "/v1/storage_rpc";
-    let addr = "http://localhost:".to_owned() + &sn.ip + target;
+    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
     let client = reqwest::Client::new();
 
@@ -250,7 +250,7 @@ pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
     let target = "/v1/storage_rpc";
-    let addr = "http://localhost:".to_owned() + &sn.ip + target;
+    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
     let client = reqwest::Client::new();
 
@@ -300,12 +300,12 @@ pub fn send_message_to_pk(sm: &SwarmManager, pk_str: &str, msg: &str) -> Result<
 
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
-    let res = send_message(&sn.ip, &pk_str, &msg);
+    let res = send_message(&sn.port, &pk_str, &msg);
 
     if res.is_ok() {
-        debug!("sent msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.ip, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
+        debug!("sent msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.port, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
     } else {
-        error!("could not send msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.ip, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
+        error!("could not send msg <{}> to sn {} (swarm {}, pk {})", &msg, &sn.port, &sm.swarms[swarm_idx as usize].swarm_id, &pk_str);
     }
 
     res
@@ -355,10 +355,10 @@ pub fn send_random_message(sm: &SwarmManager, mut rng : &mut StdRng) -> Result<(
     let num = rng.gen::<u64>();
     let msg = num.to_string() + &num.to_string() + &num.to_string();
 
-    let res = send_message(&sn.ip, &pk_str, &msg);
+    let res = send_message(&sn.port, &pk_str, &msg);
 
     if res.is_ok() {
-        info!("sending random message <{}> to {} to sn {} from swarm {}", msg, pk_str, &sn.ip, swarm_idx);
+        info!("sending random message <{}> to {} to sn {} from swarm {}", msg, pk_str, &sn.port, swarm_idx);
         return Ok((pk_str.to_owned(), msg.to_owned()));
     }
 

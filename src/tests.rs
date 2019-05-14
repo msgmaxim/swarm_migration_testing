@@ -27,7 +27,7 @@ pub fn async_test(bc: &Arc<Mutex<Blockchain>>) {
 
     let mut rng = StdRng::seed_from_u64(0);
     let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0]
-        .ip
+        .port
         .clone();
     let pk = PubKey::gen_random(&mut rng).to_string();
 
@@ -85,7 +85,7 @@ pub fn one_node_big_data(bc: &Arc<Mutex<Blockchain>>) {
 
     // make a copy here assuming that swarms are not going to change
     let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0]
-        .ip
+        .port
         .clone();
 
     // I have to manually count the messages as currently I can only use ctx locking
@@ -152,7 +152,7 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
     let pk = PubKey::gen_random(&mut rng);
 
     let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0]
-        .ip
+        .port
         .clone();
     crate::client::send_message(&ip, &pk.to_string(), "マンゴー").unwrap();
 
@@ -637,38 +637,35 @@ pub fn test_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
 pub fn test_with_wierd_clients(bc: &Arc<Mutex<Blockchain>>) {
     let sm = &mut bc.lock().unwrap().swarm_manager;
 
-    let ctx = TestContext::new(Arc::clone(&bc));
-    let ctx = Arc::new(Mutex::new(ctx));
+    let mut ctx = TestContext::new(Arc::clone(&bc));
 
     let bc = Arc::clone(&bc);
 
-    sm.add_swarm(&[1]);
+    ctx.add_swarm(1);
 
-    std::thread::spawn(move || {
-        // give SNs some time to initialize their servers
-        sleep_ms(200);
+    // give SNs some time to initialize their servers
+    sleep_ms(200);
 
-        // Construct an unreasonably large message:
-        let mut large_msg = String::new();
+    // Construct an unreasonably large message:
+    let mut large_msg = String::new();
 
-        // NOTE: Our server fails on this (Error(9): body limit exceeded)
-        for _ in 0..200000 {
-            large_msg.push_str("012345657");
-        }
+    // NOTE: Our server fails on this (Error(9): body limit exceeded)
+    for _ in 0..200000 {
+        large_msg.push_str("012345657");
+    }
 
-        ctx.lock().unwrap().send_message(
-            "ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351",
-            &large_msg,
-        );
+    ctx.send_message(
+        "ba0b9f5d5f82231c72696d12bb7cbaef3da3670a59c831b5b402986f9dcc3351",
+        &large_msg,
+    );
 
-        sleep_ms(2000);
+    sleep_ms(2000);
 
-        ctx.lock().unwrap().check_messages();
+    ctx.check_messages();
 
-        sleep_ms(2000);
+    sleep_ms(2000);
 
-        ctx.lock().unwrap().check_messages();
-    });
+    ctx.check_messages();
 }
 
 use tokio::prelude::*;
