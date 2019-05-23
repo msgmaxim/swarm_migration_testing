@@ -72,6 +72,8 @@ fn gen_random_hash() -> String {
     format!("{:016x}{:016x}{:016x}{:016x}", n1, n2, n3, n4)
 }
 
+pub static RPC_PORT: u16 = 22029;
+
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
         // 0 is used to indicate that SN haven't synced yet
@@ -141,6 +143,19 @@ impl Blockchain {
         serde_json::to_string(&response).expect("could not construct json")
     }
 
+    fn construct_bc_test_json(&self) -> String {
+
+        println!("construct bc test json");
+
+        let res = serde_json::json!({
+            "result": {
+                "res_height": 123
+            }
+        });
+
+        res.to_string()
+    }
+
     fn process_json_rpc(&mut self, val: serde_json::Value) -> String {
         let mut res = String::new();
 
@@ -151,8 +166,8 @@ impl Blockchain {
                 "get_service_nodes" => {
                     res = self.construct_swarm_json();
                 }
-                "get_swarm_by_pk" => {
-                    warn!("TODO: handle get_swarm_by_pk");
+                "perform_blockchain_test" => {
+                    res = self.construct_bc_test_json();
                 }
                 _ => {
                     warn!("unknown method: <{}>", &method);
@@ -192,7 +207,7 @@ pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::Jo
             Ok(final_res)
         });
 
-        let port = 22029.to_string();
+        let port = RPC_PORT.to_string();
 
         println!("starting RPC server on port {}...", &port);
 

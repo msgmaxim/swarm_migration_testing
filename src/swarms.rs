@@ -1,6 +1,6 @@
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use crate::rpc_server::KeyPair;
+use crate::rpc_server::{KeyPair, RPC_PORT};
 use std::fmt::{self, Debug};
 use std::io::prelude::*;
 
@@ -151,6 +151,8 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg("debug");
     server_process.arg("--lokid-key");
     server_process.arg("key.txt");
+    server_process.arg("--lokid-rpc-port");
+    server_process.arg(&RPC_PORT.to_string());
 
     match server_process.spawn() {
         Ok(child) => Some(child),
