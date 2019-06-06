@@ -47,7 +47,8 @@ impl Debug for Blockchain {
 struct ServiceNodeState {
     service_node_pubkey: String,
     secret_key: String,
-    port: String,
+    public_ip: String,
+    storage_port: u16,
     swarm_id: u64,
 }
 
@@ -119,12 +120,15 @@ impl Blockchain {
             for sn in &swarm.nodes {
                 let service_node_pubkey = sn.pubkey.clone();
                 let secret_key = sn.seckey.clone();
-                let port = sn.port.clone();
+                let public_ip = String::from("localhost");
+                let secret_key = sn.seckey.clone();
+                let storage_port = sn.port.clone().parse::<u16>().unwrap();
                 let swarm_id = swarm.swarm_id;
                 sn_list.push(ServiceNodeState {
                     service_node_pubkey,
                     secret_key,
-                    port,
+                    public_ip,
+                    storage_port,
                     swarm_id,
                 })
             }
