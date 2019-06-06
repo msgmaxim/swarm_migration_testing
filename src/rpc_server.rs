@@ -121,8 +121,7 @@ impl Blockchain {
                 let service_node_pubkey = sn.pubkey.clone();
                 let secret_key = sn.seckey.clone();
                 let public_ip = String::from("localhost");
-                let secret_key = sn.seckey.clone();
-                let storage_port = sn.port.clone().parse::<u16>().unwrap();
+                let storage_port = sn.port.parse::<u16>().unwrap();
                 let swarm_id = swarm.swarm_id;
                 sn_list.push(ServiceNodeState {
                     service_node_pubkey,
