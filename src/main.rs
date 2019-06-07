@@ -35,9 +35,12 @@ fn print_sn_data(swarm: &Swarm) {
 
 fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
     let target = "/quit";
-    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
-    let client = reqwest::Client::new();
+    let addr = "https://localhost:".to_owned() + &sn.port + target;
+
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build().unwrap();
 
     if let Err(_e) = client.post(&addr).send() {
         error!("could not send /quit request to a node at {}", &sn.port);

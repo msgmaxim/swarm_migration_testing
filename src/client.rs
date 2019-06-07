@@ -85,7 +85,7 @@ pub fn send_message_async(client: &hyper::Client<HttpConnector, Body>, port: &st
     let body = serde_json::to_string(&msg).unwrap();
 
     let target = "/v1/storage_rpc";
-    let uri = "http://localhost:".to_owned() + port + target;
+    let uri = "https://localhost:".to_owned() + port + target;
     let uri: hyper::Uri = uri.parse().unwrap();
 
     let mut req = hyper::Request::new(Body::from(body));
@@ -100,9 +100,11 @@ pub fn send_message_async(client: &hyper::Client<HttpConnector, Body>, port: &st
 
 pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
     let target = "/v1/storage_rpc";
-    let addr = "http://localhost:".to_owned() + port + target;
+    let addr = "https://localhost:".to_owned() + port + target;
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build().unwrap();
 
     // Prepend the two characters like signal does
     let pk = "05".to_owned() + &pk;
@@ -153,9 +155,11 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
 pub fn request_all_messages(sn: &str) -> Vec<MessageResponseFull> {
 
     let target = "/retrieve_all";
-    let addr = "http://localhost:".to_owned() + &sn + target;
+    let addr = "https://localhost:".to_owned() + &sn + target;
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build().unwrap();
     let req = client.post(&addr);
 
     match req.send() {
@@ -188,9 +192,13 @@ pub fn request_messages(sn: &ServiceNode, pk: &str) -> Vec<MessageResponse> {
 pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) -> Vec<MessageResponse> {
 
     let target = "/v1/storage_rpc";
-    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
-    let client = reqwest::Client::new();
+    let addr = "https://localhost:".to_owned() + &sn.port + target;
+
+
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build().unwrap();
 
     // Prepend the two characters like signal does
     let pk = "05".to_owned() + &pk;
@@ -250,9 +258,12 @@ pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
     let target = "/v1/storage_rpc";
-    let addr = "http://localhost:".to_owned() + &sn.port + target;
 
-    let client = reqwest::Client::new();
+    let addr = "https://localhost:".to_owned() + &sn.port + target;
+
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build().unwrap();
 
     let msg = GetSnodesBody {
         method: "get_snodes_for_pubkey".to_owned(),
@@ -320,7 +331,7 @@ pub fn barrage_messages(port: &str) {
 
         let client = hyper::Client::new();
 
-        let uri = format!("http://0.0.0.0:{}/v1/swarms/push", port);
+        let uri = format!("https://0.0.0.0:{}/v1/swarms/push", port);
 
         let mut req = hyper::Request::builder().method("post").uri(uri).body(Body::from("hello")).unwrap();
 
