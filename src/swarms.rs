@@ -131,6 +131,13 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
         server_process.stdout(std::process::Stdio::from(stdout_file));
     }
 
+    // Copy ssl certificate and keys
+    {
+        std::fs::copy("shared_files/cert.pem", path.join("cert.pem")).expect("could not copy a file");
+        std::fs::copy("shared_files/dh.pem", path.join("dh.pem")).expect("could not copy a file");
+        std::fs::copy("shared_files/key.pem", path.join("key.pem")).expect("could not copy a file");
+    }
+
     {
         let key_path = path.join("key.txt");
         let mut file = std::fs::File::create(&key_path).expect("could not create key file");
