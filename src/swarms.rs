@@ -160,6 +160,8 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg("key.txt");
     server_process.arg("--lokid-rpc-port");
     server_process.arg(&RPC_PORT.to_string());
+    server_process.arg("--data-dir");
+    server_process.arg(".");
 
     match server_process.spawn() {
         Ok(child) => Some(child),
