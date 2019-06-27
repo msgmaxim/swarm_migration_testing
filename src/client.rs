@@ -84,7 +84,7 @@ pub fn send_message_async(client: &hyper::Client<HttpConnector, Body>, port: &st
 
     let body = serde_json::to_string(&msg).unwrap();
 
-    let target = "/v1/storage_rpc";
+    let target = "/storage_rpc/v1";
     let uri = "https://localhost:".to_owned() + port + target;
     let uri: hyper::Uri = uri.parse().unwrap();
 
@@ -99,7 +99,7 @@ pub fn send_message_async(client: &hyper::Client<HttpConnector, Body>, port: &st
 }
 
 pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
-    let target = "/v1/storage_rpc";
+    let target = "/storage_rpc/v1";
     let addr = "https://localhost:".to_owned() + port + target;
 
     let client = reqwest::Client::builder()
@@ -191,7 +191,7 @@ pub fn request_messages(sn: &ServiceNode, pk: &str) -> Vec<MessageResponse> {
 
 pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) -> Vec<MessageResponse> {
 
-    let target = "/v1/storage_rpc";
+    let target = "/storage_rpc/v1";
 
     let addr = "https://localhost:".to_owned() + &sn.port + target;
 
@@ -257,7 +257,7 @@ pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
 
     let sn = &sm.swarms[swarm_idx as usize].nodes[0];
 
-    let target = "/v1/storage_rpc";
+    let target = "/storage_rpc/v1";
 
     let addr = "https://localhost:".to_owned() + &sn.port + target;
 
@@ -331,7 +331,7 @@ pub fn barrage_messages(port: &str) {
 
         let client = hyper::Client::new();
 
-        let uri = format!("https://0.0.0.0:{}/v1/swarms/push", port);
+        let uri = format!("https://0.0.0.0:{}/swarms/push/v1", port);
 
         let mut req = hyper::Request::builder().method("post").uri(uri).body(Body::from("hello")).unwrap();
 

@@ -172,6 +172,9 @@ impl Blockchain {
                 "perform_blockchain_test" => {
                     res = self.construct_bc_test_json();
                 }
+                "storage_server_ping" => {
+                    // println!("PINGED FROM STORAGE");
+                }
                 _ => {
                     warn!("unknown method: <{}>", &method);
                 }
