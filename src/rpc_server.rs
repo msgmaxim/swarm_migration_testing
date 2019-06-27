@@ -57,6 +57,7 @@ struct SwarmResult {
     service_node_states: Vec<ServiceNodeState>,
     height: u64,
     block_hash: String,
+    hardfork: u8
 }
 
 #[derive(Serialize, Debug)]
@@ -140,6 +141,7 @@ impl Blockchain {
                 service_node_states,
                 height: self.height,
                 block_hash: self.block_hash.clone(),
+                hardfork: 12
             },
         };
 
@@ -166,7 +168,7 @@ impl Blockchain {
             trace!("got json rcp request, method: {:?}", &method);
 
             match method {
-                "get_service_nodes" => {
+                "get_n_service_nodes" => {
                     res = self.construct_swarm_json();
                 }
                 "perform_blockchain_test" => {
