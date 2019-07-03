@@ -127,8 +127,10 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
 
         let stdout_file = stderr_file.try_clone().unwrap();
 
-        server_process.stderr(std::process::Stdio::from(stderr_file));
-        server_process.stdout(std::process::Stdio::from(stdout_file));
+        if (sn.port != 5902.to_string()) {
+            server_process.stderr(std::process::Stdio::from(stderr_file));
+            server_process.stdout(std::process::Stdio::from(stdout_file));
+        }
     }
 
     // Copy ssl certificate and keys
@@ -323,7 +325,7 @@ impl SwarmManager {
     /// This does not modify swarm structure leaving the
     /// disconnected snode in the list.
     pub fn disconnect_snode(&mut self) -> ServiceNode {
-        let mut swarm = &self.swarms.choose(&mut self.rng).unwrap();
+        let swarm = &self.swarms.choose(&mut self.rng).unwrap();
 
         let snode = swarm.nodes.choose(&mut self.rng).unwrap();
 

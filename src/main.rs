@@ -116,7 +116,7 @@ fn main() {
 
     // Note: when testing long-polling, need to
     // modify client request to use the right header
-    // tests::long_polling(&blockchain);
+    tests::long_polling(&blockchain);
 
     // tests::one_node_big_data(&blockchain);
     // tests::test_bootstrapping_peer_big_data(&blockchain);
@@ -129,7 +129,8 @@ fn main() {
     // tests::test_retry_batches(&blockchain);
     // tests::test_retry_singles(&blockchain);
     // tests::peer_testing(&blockchain);
-    tests::test_blocks(&blockchain, &options);
+    // tests::test_blocks(&blockchain, &options);
+    // tests::test_persistent_blocks(&blockchain, &options);
 
 
     let stdin = std::io::stdin();

@@ -17,6 +17,7 @@ pub struct Blockchain {
     height: u64,
     keypair_pool: Vec<KeyPair>,
     block_hash: String,
+    sys_time: std::time::SystemTime,
 }
 
 impl Display for Blockchain {
@@ -56,13 +57,14 @@ struct ServiceNodeState {
 struct SwarmResult {
     service_node_states: Vec<ServiceNodeState>,
     height: u64,
+    target_height: u64,
     block_hash: String,
     hardfork: u8
 }
 
 #[derive(Serialize, Debug)]
-struct SwarmResponse {
-    result: SwarmResult,
+struct RpcResponse<Type> {
+    result: Type,
 }
 
 fn gen_random_hash() -> String {
@@ -79,7 +81,7 @@ pub static RPC_PORT: u16 = 22029;
 impl Blockchain {
     pub fn new(swarm_manager: SwarmManager) -> Blockchain {
         // 0 is used to indicate that SN haven't synced yet
-        let height = 1;
+        let height = 2;
         let block_hash = gen_random_hash();
 
         // read keys file
@@ -103,6 +105,7 @@ impl Blockchain {
             keypair_pool,
             height,
             block_hash,
+            sys_time : std::time::SystemTime::now(),
         }
     }
 
@@ -136,10 +139,11 @@ impl Blockchain {
 
         let service_node_states = sn_list;
 
-        let response = SwarmResponse {
+        let response = RpcResponse::<SwarmResult> {
             result: SwarmResult {
                 service_node_states,
                 height: self.height,
+                target_height: self.get_target_height(),
                 block_hash: self.block_hash.clone(),
                 hardfork: 12
             },
@@ -148,9 +152,18 @@ impl Blockchain {
         serde_json::to_string(&response).expect("could not construct json")
     }
 
-    fn construct_bc_test_json(&self) -> String {
+    fn get_target_height(&self) -> u64 {
 
-        println!("construct bc test json");
+        self.height
+
+        // if self.sys_time.elapsed().unwrap() >= std::time::Duration::from_secs(1) {
+        //     self.height
+        // } else {
+        //     0
+        // }
+    }
+
+    fn construct_bc_test_json(&self) -> String {
 
         let res = serde_json::json!({
             "result": {
@@ -161,6 +174,18 @@ impl Blockchain {
         res.to_string()
     }
 
+    fn construct_ping_json(&self) -> String {
+
+        let res = serde_json::json!({
+            "result": {
+                "status": "OK"
+            }
+        });
+
+        res.to_string()
+
+    }
+
     fn process_json_rpc(&mut self, val: serde_json::Value) -> String {
         let mut res = String::new();
 
@@ -169,13 +194,14 @@ impl Blockchain {
 
             match method {
                 "get_n_service_nodes" => {
+                    // println!("GET get_n_service_nodes");
                     res = self.construct_swarm_json();
                 }
                 "perform_blockchain_test" => {
                     res = self.construct_bc_test_json();
                 }
                 "storage_server_ping" => {
-                    // println!("PINGED FROM STORAGE");
+                    res = self.construct_ping_json();
                 }
                 _ => {
                     warn!("unknown method: <{}>", &method);
@@ -198,6 +224,9 @@ pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::Jo
 
     let thread = std::thread::spawn(move || {
         let server = simple_server::Server::new(move |req, mut res| {
+
+            // println!("got new connection");
+
             let req_body = String::from_utf8_lossy(req.body());
 
             let mut res_body = String::new();

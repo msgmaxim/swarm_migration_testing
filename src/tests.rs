@@ -145,16 +145,16 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
     let ctx = TestContext::new(Arc::clone(&bc));
     let ctx = Arc::new(Mutex::new(ctx));
 
-    ctx.lock().unwrap().add_swarm(1);
+    ctx.lock().expect("1").add_swarm(1);
 
     sleep_ms(300);
 
     let pk = PubKey::gen_random(&mut rng);
 
-    let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0]
+    let ip = bc.lock().expect("2").swarm_manager.swarms[0].nodes[0]
         .port
         .clone();
-    crate::client::send_message(&ip, &pk.to_string(), "マンゴー").unwrap();
+    crate::client::send_message(&ip, &pk.to_string(), "マンゴー").expect("3");
 
     let ctx_clone = Arc::clone(&ctx);
     let pk_clone = pk.clone();
@@ -163,23 +163,23 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
         // check messages every 100 ms
         let mut last_hash = String::new();
 
-        for _ in 0..30 {
-            sleep_ms(100);
+        for _ in 0..3000 {
+            sleep_ms(2000);
             let msgs = ctx_clone
                 .lock()
-                .unwrap()
+                .expect("4")
                 .get_new_messages(&pk_clone, &last_hash);
             dbg!(&msgs);
 
             if !msgs.is_empty() {
-                last_hash = msgs.last().unwrap().hash.clone();
+                last_hash = msgs.last().expect("4").hash.clone();
             }
         }
     });
 
     // send another message in 2s
     sleep_ms(2000);
-    crate::client::send_message(&ip, &pk.to_string(), "второе сообщение").unwrap();
+    crate::client::send_message(&ip, &pk.to_string(), "второе сообщение").expect("5");
 }
 
 #[allow(dead_code)]
@@ -560,6 +560,58 @@ fn generate_blocks(
     }
 }
 
+#[allow(dead_code)]
+pub fn test_persistent_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
+
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let pks = gen_rand_pubkeys(100, &mut rng);
+
+    let ctx = TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
+
+    let running_flag = Arc::new(AtomicBool::new(true));
+
+    let duration = opt.duration;
+    let running = running_flag.clone();
+    let timer_thread = std::thread::spawn(move || {
+        std::thread::sleep(duration);
+        running.store(false, Ordering::SeqCst);
+    });
+
+    ctx.lock().unwrap().add_swarm(3);
+
+    for i in 0..10 {
+        ctx.lock().unwrap().add_snode();
+    }
+
+    let message_thread = generate_messages_thread(&ctx, &pks, opt.clone(), &rng, &running_flag);
+
+    for i in 0.. {
+
+        std::thread::sleep(opt.block_interval);
+
+        println!("iteration: {}", i);
+        info!("iteration: {}", i);
+
+        ctx.lock().unwrap().inc_block_height();
+
+        if !running_flag.load(Ordering::SeqCst) {
+            break;
+        }
+    }
+
+    timer_thread.join().unwrap();
+    message_thread.join().unwrap();
+
+    // wait for the duration of one block to
+    // make sure all message have been propagated
+    std::thread::sleep(opt.block_interval);
+
+    ctx.lock().unwrap().print_stats();
+    ctx.lock().unwrap().check_messages();
+}
+
 /// `reliable` determines whether nodes can disconnect from time
 /// to time for a short period of time
 #[allow(dead_code)]
@@ -580,7 +632,6 @@ pub fn test_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
         let running = running_flag.clone();
 
         let duration = opt.duration;
-        // TODO: use a timer instead
         let timer_thread = std::thread::spawn(move || {
             std::thread::sleep(duration);
             running.store(false, Ordering::SeqCst);
