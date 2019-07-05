@@ -560,6 +560,58 @@ fn generate_blocks(
     }
 }
 
+#[allow(dead_code)]
+pub fn test_persistent_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
+
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let pks = gen_rand_pubkeys(100, &mut rng);
+
+    let ctx = TestContext::new(Arc::clone(&bc));
+    let ctx = Arc::new(Mutex::new(ctx));
+
+    let running_flag = Arc::new(AtomicBool::new(true));
+
+    let duration = opt.duration;
+    let running = running_flag.clone();
+    let timer_thread = std::thread::spawn(move || {
+        std::thread::sleep(duration);
+        running.store(false, Ordering::SeqCst);
+    });
+
+    ctx.lock().unwrap().add_swarm(3);
+
+    for i in 0..10 {
+        ctx.lock().unwrap().add_snode();
+    }
+
+    let message_thread = generate_messages_thread(&ctx, &pks, opt.clone(), &rng, &running_flag);
+
+    for i in 0.. {
+
+        std::thread::sleep(opt.block_interval);
+
+        println!("iteration: {}", i);
+        info!("iteration: {}", i);
+
+        ctx.lock().unwrap().inc_block_height();
+
+        if !running_flag.load(Ordering::SeqCst) {
+            break;
+        }
+    }
+
+    timer_thread.join().unwrap();
+    message_thread.join().unwrap();
+
+    // wait for the duration of one block to
+    // make sure all message have been propagated
+    std::thread::sleep(opt.block_interval);
+
+    ctx.lock().unwrap().print_stats();
+    ctx.lock().unwrap().check_messages();
+}
+
 /// `reliable` determines whether nodes can disconnect from time
 /// to time for a short period of time
 #[allow(dead_code)]

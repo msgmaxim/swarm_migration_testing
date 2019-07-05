@@ -104,7 +104,7 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
 
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
-        .build().unwrap();
+        .build().expect("building certificate");
 
     // Prepend the two characters like signal does
     let pk = "05".to_owned() + &pk;
@@ -124,7 +124,7 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
         },
     };
 
-    let msg = serde_json::to_string(&msg).unwrap();
+    let msg = serde_json::to_string(&msg).expect("building json");
 
     let req = client
         .post(&addr)

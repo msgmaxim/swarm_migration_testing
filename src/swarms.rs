@@ -155,7 +155,7 @@ pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
     server_process.arg(sn.port.to_string());
     server_process.arg("--log-level");
     // server_process.arg("trace");
-    server_process.arg("debug");
+    server_process.arg("info");
     server_process.arg("--lokid-key");
     server_process.arg("key.txt");
     server_process.arg("--lokid-rpc-port");

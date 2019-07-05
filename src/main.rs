@@ -130,6 +130,7 @@ fn main() {
     // tests::test_retry_singles(&blockchain);
     // tests::peer_testing(&blockchain);
     tests::test_blocks(&blockchain, &options);
+    // tests::test_persistent_blocks(&blockchain, &options);
 
 
     let stdin = std::io::stdin();
