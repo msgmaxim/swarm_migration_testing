@@ -206,7 +206,7 @@ impl TestContext {
 
         let bc_copy = self.bc.clone();
 
-        let t = std::thread::spawn(move || {
+        let _ = std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             bc_copy.lock().unwrap().swarm_manager.restore_snode(&sn.expect("spawned node is none"));
         });
@@ -234,7 +234,7 @@ impl TestContext {
 
         let bc_copy = self.bc.clone();
 
-        let t = std::thread::spawn(move || {
+        let _ = std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
 
             // TODO: need to check if the node has been dropped already

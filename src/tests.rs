@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use std::fmt::{self, Debug};
 
 use futures::future::lazy;
 
@@ -44,10 +43,10 @@ pub fn async_test(bc: &Arc<Mutex<Blockchain>>) {
             let msg = crate::client::make_random_message(&mut rng);
             let fut = crate::client::send_message_async(&client, &ip, &pk, &msg);
 
-            let mut failed = failed.clone();
-            let mut saved = saved.clone();
+            let failed = failed.clone();
+            let saved = saved.clone();
 
-            let mut failed2 = failed.clone();
+            let failed2 = failed.clone();
 
             tokio::spawn(
                 fut.and_then(move |res| {
@@ -585,7 +584,7 @@ pub fn test_persistent_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
 
     ctx.lock().unwrap().add_swarm(3);
 
-    for i in 0..10 {
+    for _ in 0..10 {
         ctx.lock().unwrap().add_snode();
     }
 
@@ -690,11 +689,8 @@ pub fn test_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
 
 #[allow(dead_code)]
 pub fn test_with_wierd_clients(bc: &Arc<Mutex<Blockchain>>) {
-    let sm = &mut bc.lock().unwrap().swarm_manager;
 
     let mut ctx = TestContext::new(Arc::clone(&bc));
-
-    let bc = Arc::clone(&bc);
 
     ctx.add_swarm(1);
 

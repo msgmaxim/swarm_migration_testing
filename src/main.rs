@@ -105,7 +105,7 @@ fn main() {
         message_interval : std::time::Duration::from_millis(50),
     };
 
-    let long_test_opt = tests::TestOptions {
+    let _long_test_opt = tests::TestOptions {
         reliable_snodes: true,
         duration: from_mins(5),
         block_interval: std::time::Duration::from_secs(10),

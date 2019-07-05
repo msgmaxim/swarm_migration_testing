@@ -4,7 +4,6 @@ use crate::swarms::*;
 use rand::prelude::*;
 use std::fmt::{self, Debug, Display};
 
-use std::fs::File;
 use std::io::prelude::*;
 
 pub struct KeyPair {
@@ -154,13 +153,11 @@ impl Blockchain {
 
     fn get_target_height(&self) -> u64 {
 
-        self.height
-
-        // if self.sys_time.elapsed().unwrap() >= std::time::Duration::from_secs(1) {
-        //     self.height
-        // } else {
-        //     0
-        // }
+        if self.sys_time.elapsed().unwrap() >= std::time::Duration::from_secs(0) {
+            self.height
+        } else {
+            0
+        }
     }
 
     fn construct_bc_test_json(&self) -> String {

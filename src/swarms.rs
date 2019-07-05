@@ -2,9 +2,8 @@ use rand::prelude::*;
 use rand::seq::SliceRandom;
 use crate::rpc_server::{KeyPair, RPC_PORT};
 use std::fmt::{self, Debug};
-use std::io::prelude::*;
 
-use byteorder::{LittleEndian, BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceNode {
@@ -31,9 +30,9 @@ pub struct Swarm {
 
 impl Debug for Swarm {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: ", &self.swarm_id);
+        write!(f, "{}: ", &self.swarm_id).expect("printing a swarm");
         for sn in &self.nodes {
-            write!(f, "{:?} ", sn.port);
+            write!(f, "{:?} ", sn.port).expect("printing a swarm");
         }
         Ok(())
     }
@@ -81,7 +80,7 @@ impl PubKey {
     }
 
     pub fn gen_random(rng: &mut StdRng) -> PubKey {
-        let mut pk = [
+        let pk = [
             rng.next_u64(),
             rng.next_u64(),
             rng.next_u64(),
@@ -323,7 +322,7 @@ impl SwarmManager {
     /// This does not modify swarm structure leaving the
     /// disconnected snode in the list.
     pub fn disconnect_snode(&mut self) -> ServiceNode {
-        let mut swarm = &self.swarms.choose(&mut self.rng).unwrap();
+        let swarm = &self.swarms.choose(&mut self.rng).unwrap();
 
         let snode = swarm.nodes.choose(&mut self.rng).unwrap();
 
@@ -361,7 +360,7 @@ impl SwarmManager {
         trace!("Have {} swarms to steal from", big_swarms.len());
 
         if big_swarms.len() > 0 {
-            let mut big_swarm = big_swarms.choose_mut(&mut self.rng).unwrap();
+            let big_swarm = big_swarms.choose_mut(&mut self.rng).unwrap();
             let node_idx = self.rng.gen_range(0, big_swarm.nodes.len());
             let mov_node = big_swarm.nodes.remove(node_idx);
 
@@ -447,7 +446,7 @@ impl SwarmManager {
         }
 
         // Figure out which swarm this node is to join
-        let mut rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
+        let rand_swarm = self.swarms.choose_mut(&mut self.rng).unwrap();
 
         trace!("choosing swarm: {}", rand_swarm.swarm_id);
 
@@ -500,7 +499,7 @@ impl SwarmManager {
     }
 
     pub fn quit_children(&mut self) {
-        /// NOTE: some of these nodes are not running anymore
+        // NOTE: some of these nodes are not running anymore
         print!("Quitting {} nodes...", self.sn_to_child.len());
         for (sn, child) in &mut self.sn_to_child {
             let _ = crate::send_req_to_quit(&sn);

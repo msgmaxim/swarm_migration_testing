@@ -132,7 +132,7 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
         .body(msg);
 
     match req.send() {
-        Ok(mut res) => {
+        Ok(res) => {
 
             if res.status().is_success() {
                 Ok(())
@@ -238,6 +238,7 @@ pub fn request_messages_given_hash(sn: &ServiceNode, pk: &str, last_hash: &str) 
     }
 }
 
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 struct SnodesParams {
     pubKey: String,
@@ -249,6 +250,7 @@ struct GetSnodesBody {
     params: SnodesParams
 }
 
+#[allow(dead_code)]
 pub fn get_snodes_for_pk(sm: &SwarmManager, pk_str: &str) {
 
     let pk = PubKey::new(&pk_str).unwrap();
@@ -333,7 +335,7 @@ pub fn barrage_messages(port: &str) {
 
         let uri = format!("https://0.0.0.0:{}/swarms/push/v1", port);
 
-        let mut req = hyper::Request::builder().method("post").uri(uri).body(Body::from("hello")).unwrap();
+        let req = hyper::Request::builder().method("post").uri(uri).body(Body::from("hello")).unwrap();
 
         let fut = client.request(req).map(|_|{
             println!("It's a success!");
