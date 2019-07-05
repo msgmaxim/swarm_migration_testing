@@ -145,16 +145,18 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
     let ctx = TestContext::new(Arc::clone(&bc));
     let ctx = Arc::new(Mutex::new(ctx));
 
-    ctx.lock().unwrap().add_swarm(1);
+    ctx.lock().expect("locking ctx").add_swarm(1);
 
     sleep_ms(300);
 
     let pk = PubKey::gen_random(&mut rng);
 
-    let ip = bc.lock().unwrap().swarm_manager.swarms[0].nodes[0]
+    let ip = bc.lock().expect("locking blockchain").swarm_manager.swarms[0].nodes[0]
         .port
         .clone();
-    crate::client::send_message(&ip, &pk.to_string(), "マンゴー").unwrap();
+    if crate::client::send_message(&ip, &pk.to_string(), "マンゴー").is_err() {
+        error!("Could not send message");
+    }
 
     let ctx_clone = Arc::clone(&ctx);
     let pk_clone = pk.clone();
@@ -163,11 +165,11 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
         // check messages every 100 ms
         let mut last_hash = String::new();
 
-        for _ in 0..30 {
-            sleep_ms(100);
+        for _ in 0..5 {
+            sleep_ms(5000);
             let msgs = ctx_clone
                 .lock()
-                .unwrap()
+                .expect("locking ctx")
                 .get_new_messages(&pk_clone, &last_hash);
             dbg!(&msgs);
 
@@ -179,7 +181,9 @@ pub fn long_polling(bc: &Arc<Mutex<Blockchain>>) {
 
     // send another message in 2s
     sleep_ms(2000);
-    crate::client::send_message(&ip, &pk.to_string(), "второе сообщение").unwrap();
+    if crate::client::send_message(&ip, &pk.to_string(), "второе сообщение").is_err() {
+        error!("Could not send message");
+    }
 }
 
 #[allow(dead_code)]
@@ -632,7 +636,6 @@ pub fn test_blocks(bc: &Arc<Mutex<Blockchain>>, opt: &TestOptions) {
         let running = running_flag.clone();
 
         let duration = opt.duration;
-        // TODO: use a timer instead
         let timer_thread = std::thread::spawn(move || {
             std::thread::sleep(duration);
             running.store(false, Ordering::SeqCst);
