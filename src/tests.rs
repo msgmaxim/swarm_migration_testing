@@ -1,4 +1,4 @@
-use crate::rpc_server::Blockchain;
+use crate::blockchain::Blockchain;
 use crate::swarms::PubKey;
 use crate::test_context::TestContext;
 use std::sync::atomic::{AtomicBool, Ordering};

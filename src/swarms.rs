@@ -1,6 +1,7 @@
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use crate::rpc_server::{KeyPair, RPC_PORT};
+use crate::rpc_server::{RPC_PORT};
+use crate::blockchain::{KeyPair};
 use std::fmt::{self, Debug};
 
 use byteorder::{BigEndian, WriteBytesExt};

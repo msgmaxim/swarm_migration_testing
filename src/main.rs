@@ -8,6 +8,7 @@ extern crate log;
 extern crate env_logger;
 extern crate log4rs;
 
+mod blockchain;
 mod client;
 mod rpc_server;
 mod swarms;
@@ -18,7 +19,7 @@ use rand::prelude::*;
 use std::io::prelude::*;
 use swarms::*;
 
-use rpc_server::Blockchain;
+use blockchain::Blockchain;
 use std::sync::{Arc, Mutex};
 
 fn print_sn_data(swarm: &Swarm) {

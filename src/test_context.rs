@@ -1,5 +1,4 @@
-use crate::rpc_server::Blockchain;
-use crate::rpc_server::KeyPair;
+use crate::blockchain::{Blockchain, KeyPair};
 
 use rand::prelude::*;
 use std::collections::HashMap;
