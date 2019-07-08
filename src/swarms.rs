@@ -48,6 +48,7 @@ pub struct SwarmManager {
     sn_to_child: std::collections::HashMap<ServiceNode, std::process::Child>,
     pub stats: Stats,
     rng: StdRng,
+    exe_path: String,
 }
 
 // pub type PubKey = [u64; 4];
@@ -99,11 +100,8 @@ impl PubKey {
     }
 }
 
-static SERVER_PATH: &'static str =
-    "/Users/maxim/Work/loki-storage-server/build/httpserver/httpserver";
-
-pub fn spawn_service_node(sn: &ServiceNode) -> Option<std::process::Child> {
-    let mut server_process = std::process::Command::new(&SERVER_PATH);
+pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::process::Child> {
+    let mut server_process = std::process::Command::new(exe_path);
 
     let path = std::path::Path::new("playground");
     if !path.exists() {
@@ -178,12 +176,13 @@ pub enum SpawnStrategy {
 }
 
 impl SwarmManager {
-    pub fn new() -> SwarmManager {
+    pub fn new(exe_path: &str) -> SwarmManager {
         SwarmManager {
             swarms: vec![],
             sn_to_child: std::collections::HashMap::new(),
             stats: Stats { dissolved: 0 },
             rng: StdRng::seed_from_u64(1),
+            exe_path: exe_path.to_owned(),
         }
     }
 
@@ -213,7 +212,7 @@ impl SwarmManager {
             .collect();
 
         for node in &nodes {
-            if let Some(child) = spawn_service_node(&node) {
+            if let Some(child) = spawn_service_node(&node, &self.exe_path) {
                 info!("NEW SNODE: {}", &node.port);
                 self.sn_to_child.insert(node.clone(), child);
             } else {
@@ -425,7 +424,7 @@ impl SwarmManager {
     pub fn restore_snode(&mut self, sn: &ServiceNode) {
         // TODO: check that snode actually exists
         info!("Restore SNODE: {}", &sn.port);
-        let child = spawn_service_node(&sn).expect("error spawning a service node");
+        let child = spawn_service_node(&sn, &self.exe_path).expect("error spawning a service node");
         self.sn_to_child.insert(sn.clone(), child);
 
         // Note: we don't apply any swarm changes since
@@ -436,9 +435,11 @@ impl SwarmManager {
     /// spawn a new server instance
     pub fn add_snode(&mut self, sn: &ServiceNode, spawn: SpawnStrategy) {
         info!("NEW SNODE: {}", &sn.port);
+
+        // TODO: spawn a node but register it later on the first ping
         match spawn {
             SpawnStrategy::Now => {
-                let child = spawn_service_node(&sn).expect("error spawning a service node");
+                let child = spawn_service_node(&sn, &self.exe_path).expect("error spawning a service node");
                 self.sn_to_child.insert(sn.clone(), child);
             }
             SpawnStrategy::Later => {
@@ -492,7 +493,7 @@ impl SwarmManager {
 
     pub fn create_snode(&mut self, sn: ServiceNode, swarm_idx: usize) {
         info!("NEW SNODE: {}", &sn.port);
-        let child = spawn_service_node(&sn).expect("error spawning a service node");
+        let child = spawn_service_node(&sn, &self.exe_path).expect("error spawning a service node");
         self.sn_to_child.insert(sn.clone(), child);
 
         // TODO: use loki rules to determine where the node should go

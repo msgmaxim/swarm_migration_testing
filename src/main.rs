@@ -41,7 +41,8 @@ fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
 
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     if let Err(_e) = client.post(&addr).send() {
         error!("could not send /quit request to a node at {}", &sn.port);
@@ -62,12 +63,20 @@ fn gracefully_exit(bc: &Arc<Mutex<Blockchain>>) {
     std::process::exit(0);
 }
 
-fn from_mins(mins : u64) -> std::time::Duration {
+fn from_mins(mins: u64) -> std::time::Duration {
     let secs = mins * 60;
     std::time::Duration::from_secs(secs)
 }
 
 fn main() {
+    let matches = clap::App::new("Migration Testing")
+        .version("0.1")
+        .arg(clap::Arg::with_name("binary-path").help("Path to the Storage Server binary to test").takes_value(true).required(true))
+        .get_matches();
+
+    let bin_path = matches.value_of("binary-path").expect("no value for binary-path");
+    println!("Using path: {}", bin_path);
+
     // Overwrite logs with every run
     let path = std::path::Path::new("log");
     if path.exists() {
@@ -81,7 +90,7 @@ fn main() {
         std::fs::remove_dir_all(&path).expect("Could not remove existing 'playground' directory");
     }
 
-    let swarm_manager = SwarmManager::new();
+    let swarm_manager = SwarmManager::new(bin_path);
     let blockchain = Blockchain::new(swarm_manager);
     let blockchain = Arc::new(Mutex::new(blockchain));
 
@@ -97,13 +106,13 @@ fn main() {
     })
     .expect("error handling Ctrl+C handler");
 
-        // Note: currently the test works fine to 15 minutes
+    // Note: currently the test works fine to 15 minutes
 
     let options = tests::TestOptions {
         reliable_snodes: true,
-        duration : std::time::Duration::from_secs(20),
-        block_interval : std::time::Duration::from_secs(2),
-        message_interval : std::time::Duration::from_millis(50),
+        duration: std::time::Duration::from_secs(20),
+        block_interval: std::time::Duration::from_secs(2),
+        message_interval: std::time::Duration::from_millis(50),
     };
 
     let _long_test_opt = tests::TestOptions {
