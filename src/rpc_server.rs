@@ -58,7 +58,7 @@ struct SwarmResult {
     height: u64,
     target_height: u64,
     block_hash: String,
-    hardfork: u8
+    hardfork: u8,
 }
 
 #[derive(Serialize, Debug)]
@@ -104,7 +104,7 @@ impl Blockchain {
             keypair_pool,
             height,
             block_hash,
-            sys_time : std::time::SystemTime::now(),
+            sys_time: std::time::SystemTime::now(),
         }
     }
 
@@ -116,41 +116,6 @@ impl Blockchain {
         self.swarm_manager.reset();
     }
 
-    fn construct_swarm_json(&self) -> String {
-        let mut sn_list = vec![];
-
-        for swarm in &self.swarm_manager.swarms {
-            for sn in &swarm.nodes {
-                let service_node_pubkey = sn.pubkey.clone();
-                let secret_key = sn.seckey.clone();
-                let public_ip = String::from("localhost");
-                let storage_port = sn.port.parse::<u16>().unwrap();
-                let swarm_id = swarm.swarm_id;
-                sn_list.push(ServiceNodeState {
-                    service_node_pubkey,
-                    secret_key,
-                    public_ip,
-                    storage_port,
-                    swarm_id,
-                })
-            }
-        }
-
-        let service_node_states = sn_list;
-
-        let response = RpcResponse::<SwarmResult> {
-            result: SwarmResult {
-                service_node_states,
-                height: self.height,
-                target_height: self.get_target_height(),
-                block_hash: self.block_hash.clone(),
-                hardfork: 12
-            },
-        };
-
-        serde_json::to_string(&response).expect("could not construct json")
-    }
-
     fn get_target_height(&self) -> u64 {
 
         if self.sys_time.elapsed().unwrap() >= std::time::Duration::from_secs(0) {
@@ -160,58 +125,94 @@ impl Blockchain {
         }
     }
 
-    fn construct_bc_test_json(&self) -> String {
-
-        let res = serde_json::json!({
-            "result": {
-                "res_height": 123
-            }
-        });
-
-        res.to_string()
-    }
-
-    fn construct_ping_json(&self) -> String {
-
-        let res = serde_json::json!({
-            "result": {
-                "status": "OK"
-            }
-        });
-
-        res.to_string()
-
-    }
-
-    fn process_json_rpc(&mut self, val: serde_json::Value) -> String {
-        let mut res = String::new();
-
-        if let Some(Some(method)) = val.get("method").map(|v| v.as_str()) {
-            trace!("got json rcp request, method: {:?}", &method);
-
-            match method {
-                "get_n_service_nodes" => {
-                    res = self.construct_swarm_json();
-                }
-                "perform_blockchain_test" => {
-                    res = self.construct_bc_test_json();
-                }
-                "storage_server_ping" => {
-                    res = self.construct_ping_json();
-                }
-                _ => {
-                    warn!("unknown method: <{}>", &method);
-                }
-            }
-        }
-
-        res
-    }
-
     pub fn inc_block_height(&mut self) {
         self.height += 1;
         self.block_hash = gen_random_hash();
     }
+}
+
+fn construct_swarm_json(bc: &Blockchain) -> String {
+    let mut res = String::new();
+
+    let mut sn_list = vec![];
+    for swarm in &bc.swarm_manager.swarms {
+        for sn in &swarm.nodes {
+            let service_node_pubkey = sn.pubkey.clone();
+            let secret_key = sn.seckey.clone();
+            let public_ip = String::from("localhost");
+            let storage_port = sn.port.parse::<u16>().unwrap();
+            let swarm_id = swarm.swarm_id;
+            sn_list.push(ServiceNodeState {
+                service_node_pubkey,
+                secret_key,
+                public_ip,
+                storage_port,
+                swarm_id,
+            })
+        }
+    }
+    let service_node_states = sn_list;
+
+    let response = RpcResponse::<SwarmResult> {
+        result: SwarmResult {
+            service_node_states,
+            height: bc.height,
+            target_height: bc.get_target_height(),
+            block_hash: bc.block_hash.clone(),
+            hardfork: 12,
+        },
+    };
+
+    serde_json::to_string(&response).expect("could not construct json")
+}
+
+fn construct_bc_test_json() -> String {
+
+    let res = serde_json::json!({
+        "result": {
+            "res_height": 123
+        }
+    });
+
+    res.to_string()
+}
+
+fn construct_ping_json() -> String {
+
+    let res = serde_json::json!({
+        "result": {
+            "status": "OK"
+        }
+    });
+
+    res.to_string()
+
+}
+
+fn process_json_rpc(bc: &Blockchain, req_body: serde_json::Value) -> String {
+    let mut res = String::new();
+
+    if let Some(Some(method)) = req_body.get("method").map(|v| v.as_str()) {
+        trace!("got json rcp request, method: {:?}", &method);
+
+        match method {
+            "get_n_service_nodes" => {
+                res = construct_swarm_json(&bc);
+            }
+            "perform_blockchain_test" => {
+                res = construct_bc_test_json();
+            }
+            "storage_server_ping" => {
+                res = construct_ping_json();
+            }
+            _ => {
+                warn!("unknown method: <{}>", &method);
+            }
+        }
+    }
+
+    res
+
 }
 
 /// Starts a new thread
@@ -226,7 +227,7 @@ pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::Jo
 
             if req.uri() == "/json_rpc" {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&req_body) {
-                    res_body = bc.lock().unwrap().process_json_rpc(val);
+                    res_body = process_json_rpc(&bc.lock().unwrap(), val);
                 } else {
                     warn!("invalid json: \n{:?}", &req_body);
                 }
