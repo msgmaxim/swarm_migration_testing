@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use std::fmt::{self, Debug, Display};
 use std::sync::{Arc, Mutex};
+use std::io::prelude::*;
 
 use crate::swarms::PubKey;
 use crate::swarms::ServiceNode;
@@ -19,6 +20,7 @@ pub struct TestContext {
     messages: HashMap<String, Vec<String>>,
     latest_port: u16,
     bad_snodes: Vec<ServiceNode>,
+    keypair_pool: Vec<KeyPair>,
     rng: StdRng,
 }
 
@@ -43,11 +45,29 @@ impl Debug for TestContext {
 
 impl TestContext {
     pub fn new(bc: Arc<Mutex<Blockchain>>) -> TestContext {
+
+        // read keys file
+        let mut contents = String::new();
+        let mut key_file = std::fs::File::open("keys.txt").expect("could not open key file");
+        key_file.read_to_string(&mut contents).unwrap();
+        println!("total keys: {}", contents.lines().count());
+        let keypair_pool: Vec<KeyPair> = contents
+            .lines()
+            .map(|pair| {
+                let mut pair = pair.split_whitespace();
+                KeyPair {
+                    seckey: pair.next().unwrap().to_owned(),
+                    pubkey: pair.next().unwrap().to_owned(),
+                }
+            })
+            .collect();
+
         TestContext {
             bc,
             messages: HashMap::new(),
             latest_port: 5901,
             bad_snodes: vec![],
+            keypair_pool,
             rng: StdRng::seed_from_u64(0),
         }
     }
@@ -169,6 +189,10 @@ impl TestContext {
         );
     }
 
+    fn pop_keypair(&mut self) -> KeyPair {
+        self.keypair_pool.pop().expect("Could not pop a key pair")
+    }
+
     /// Swarm manager should decide where to push this SN
     fn add_snode_with_options(&mut self, spawn: SpawnStrategy) -> Option<ServiceNode> {
         let mut res = None;
@@ -179,7 +203,7 @@ impl TestContext {
                 // let keypair = self.bc.lock().unwrap();
                 let port = i.to_string();
 
-                let keypair = self.bc.lock().unwrap().pop_keypair();
+                let keypair = self.pop_keypair();
                 let sn = ServiceNode::new(port, keypair.pubkey.clone(), keypair.seckey.clone());
                 self.bc.lock().unwrap().swarm_manager.add_snode(&sn, spawn);
 
@@ -248,13 +272,12 @@ impl TestContext {
 
     pub fn add_swarm<'a>(&mut self, n: usize) {
 
-        let mut bc = self.bc.lock().unwrap();
         let mut ports: Vec<(u16, KeyPair)> = vec![];
 
         for i in (self.latest_port + 1)..7000 {
             if is_port_available(i) {
 
-                let keypair = bc.pop_keypair();
+                let keypair = self.pop_keypair();
                 ports.push((i, keypair));
                 if ports.len() >= n {
                     self.latest_port = i;
@@ -263,6 +286,7 @@ impl TestContext {
             }
         }
 
+        let mut bc = self.bc.lock().unwrap();
         bc.swarm_manager.add_swarm(&ports);
     }
 

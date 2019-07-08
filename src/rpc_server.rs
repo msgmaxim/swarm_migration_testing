@@ -28,8 +28,6 @@ struct RpcResponse<Type> {
 pub static RPC_PORT: u16 = 22029;
 
 fn construct_swarm_json(bc: &Blockchain) -> String {
-    let mut res = String::new();
-
     let mut sn_list = vec![];
     for swarm in &bc.swarm_manager.swarms {
         for sn in &swarm.nodes {

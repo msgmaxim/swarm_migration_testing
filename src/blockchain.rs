@@ -4,7 +4,6 @@ use crate::swarms::*;
 use rand::prelude::*;
 
 use std::fmt::{self, Debug, Display};
-use std::io::prelude::*;
 
 fn gen_random_hash() -> String {
     let n1 = rand::thread_rng().gen::<u64>();
@@ -23,7 +22,6 @@ pub struct KeyPair {
 pub struct Blockchain {
     pub swarm_manager: SwarmManager,
     height: u64,
-    keypair_pool: Vec<KeyPair>,
     block_hash: String,
     sys_time: std::time::SystemTime,
 }
@@ -58,33 +56,12 @@ impl Blockchain {
         let height = 2;
         let block_hash = gen_random_hash();
 
-        // read keys file
-        let mut contents = String::new();
-        let mut key_file = std::fs::File::open("keys.txt").expect("could not open key file");
-        key_file.read_to_string(&mut contents).unwrap();
-        println!("total keys: {}", contents.lines().count());
-        let keypair_pool: Vec<KeyPair> = contents
-            .lines()
-            .map(|pair| {
-                let mut pair = pair.split_whitespace();
-                KeyPair {
-                    seckey: pair.next().unwrap().to_owned(),
-                    pubkey: pair.next().unwrap().to_owned(),
-                }
-            })
-            .collect();
-
         Blockchain {
             swarm_manager,
-            keypair_pool,
             height,
             block_hash,
             sys_time: std::time::SystemTime::now(),
         }
-    }
-
-    pub fn pop_keypair(&mut self) -> KeyPair {
-        self.keypair_pool.pop().expect("Could not pop a key pair")
     }
 
     pub fn reset(&mut self) {
