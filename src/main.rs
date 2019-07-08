@@ -21,6 +21,7 @@ use swarms::*;
 
 use blockchain::Blockchain;
 use std::sync::{Arc, Mutex};
+use test_context::TestContext;
 
 fn print_sn_data(swarm: &Swarm) {
     for sn in &swarm.nodes {
@@ -71,10 +72,17 @@ fn from_mins(mins: u64) -> std::time::Duration {
 fn main() {
     let matches = clap::App::new("Migration Testing")
         .version("0.1")
-        .arg(clap::Arg::with_name("binary-path").help("Path to the Storage Server binary to test").takes_value(true).required(true))
+        .arg(
+            clap::Arg::with_name("binary-path")
+                .help("Path to the Storage Server binary to test")
+                .takes_value(true)
+                .required(true),
+        )
         .get_matches();
 
-    let bin_path = matches.value_of("binary-path").expect("no value for binary-path");
+    let bin_path = matches
+        .value_of("binary-path")
+        .expect("no value for binary-path");
     println!("Using path: {}", bin_path);
 
     // Overwrite logs with every run
@@ -90,12 +98,15 @@ fn main() {
         std::fs::remove_dir_all(&path).expect("Could not remove existing 'playground' directory");
     }
 
-    let swarm_manager = SwarmManager::new(bin_path);
-    let blockchain = Blockchain::new(swarm_manager);
+    let blockchain = Blockchain::new(&bin_path);
     let blockchain = Arc::new(Mutex::new(blockchain));
+
+    let ctx = TestContext::new(Arc::clone(&blockchain));
+    let ctx = Arc::new(Mutex::new(ctx));
 
     // start RPC server
     let server_thread = rpc_server::start_http_server(&blockchain);
+
 
     let bc = Arc::clone(&blockchain);
 
@@ -122,25 +133,25 @@ fn main() {
         message_interval: std::time::Duration::from_millis(50),
     };
 
-    // tests::async_test(&blockchain);
+
+    // tests::async_test(&ctx);
 
     // Note: when testing long-polling, need to
     // modify client request to use the right header
-    // tests::long_polling(&blockchain);
+    // tests::long_polling(&ctx);
 
-    // tests::one_node_big_data(&blockchain);
-    // tests::test_bootstrapping_peer_big_data(&blockchain);
-    // tests::test_bootstrapping_swarm_big_data(&blockchain);
-    // tests::single_node_one_message(&blockchain);
-    // tests::single_swarm_one_message(&blockchain);
-    // tests::sinlge_swarm_joined(&blockchain);
-    // tests::multiple_swarms_static(&blockchain);
-    // tests::test_dissolving(&blockchain);
-    // tests::test_retry_batches(&blockchain);
-    // tests::test_retry_singles(&blockchain);
-    // tests::peer_testing(&blockchain);
-    tests::test_blocks(&blockchain, &options);
-    // tests::test_persistent_blocks(&blockchain, &options);
+    // tests::one_node_big_data(&ctx);
+    // tests::test_bootstrapping_peer_big_data(&ctx);
+    // tests::test_bootstrapping_swarm_big_data(&ctx);
+    // tests::single_node_one_message(&ctx);
+    // tests::single_swarm_one_message(&ctx);
+    // tests::sinlge_swarm_joined(&ctx);
+    // tests::multiple_swarms_static(&ctx);
+    // tests::test_dissolving(&ctx);
+    // tests::test_retry_batches(&ctx);
+    // tests::test_retry_singles(&ctx);
+    // tests::test_blocks(&ctx, &options);
+    tests::test_persistent_blocks(&ctx, &options);
 
 
     let stdin = std::io::stdin();
@@ -156,9 +167,10 @@ fn main() {
         }
 
         if command == "test" {
-            let sm = &blockchain.lock().unwrap().swarm_manager;
 
-            for s in &sm.swarms {
+            let swarms = ctx.lock().unwrap().get_swarms();
+
+            for s in &swarms {
                 println!("          ___swarm {}___", s.swarm_id);
                 print_sn_data(s);
             }
@@ -166,11 +178,7 @@ fn main() {
 
         if command == "send" {
             // For now: send a random message to a random PK
-            if client::send_random_message(&blockchain.lock().unwrap().swarm_manager, &mut rng)
-                .is_err()
-            {
-                eprintln!("got error sending messages");
-            }
+            ctx.lock().unwrap().send_random_message();
         }
     }
 

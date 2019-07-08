@@ -51,10 +51,12 @@ impl Debug for Blockchain {
 }
 
 impl Blockchain {
-    pub fn new(swarm_manager: SwarmManager) -> Blockchain {
+    pub fn new(bin_path: &str) -> Blockchain {
         // 0 is used to indicate that SN haven't synced yet
         let height = 2;
         let block_hash = gen_random_hash();
+
+        let swarm_manager = SwarmManager::new(bin_path);
 
         Blockchain {
             swarm_manager,
@@ -62,10 +64,6 @@ impl Blockchain {
             block_hash,
             sys_time: std::time::SystemTime::now(),
         }
-    }
-
-    pub fn reset(&mut self) {
-        self.swarm_manager.reset();
     }
 
     pub fn get_target_height(&self) -> u64 {
@@ -88,5 +86,9 @@ impl Blockchain {
     pub fn inc_block_height(&mut self) {
         self.height += 1;
         self.block_hash = gen_random_hash();
+    }
+
+    pub fn get_swarms(&self) -> Vec<Swarm> {
+        self.swarm_manager.get_swarms()
     }
 }

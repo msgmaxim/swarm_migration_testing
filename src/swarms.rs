@@ -186,19 +186,6 @@ impl SwarmManager {
         }
     }
 
-    pub fn reset(&mut self) {
-        for swarm in &self.swarms {
-            for sn in &swarm.nodes {
-                crate::send_req_to_quit(&sn);
-            }
-        }
-
-        self.swarms.clear();
-        self.sn_to_child.clear();
-        self.stats.dissolved = 0;
-        self.rng = StdRng::seed_from_u64(1);
-    }
-
     pub fn add_swarm<'a>(&mut self, nodes: &[(u16, KeyPair)]) {
         let swarm_id = self.get_next_swarm_id();
 
@@ -509,5 +496,9 @@ impl SwarmManager {
         }
 
         println!("done");
+    }
+
+    pub fn get_swarms(&self) -> Vec<Swarm> {
+        self.swarms.clone()
     }
 }

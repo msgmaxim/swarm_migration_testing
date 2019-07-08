@@ -4,11 +4,7 @@ Framework for testing data migration for swarms.
 ## Building
 
 1. Install *rustup* (https://rustup.rs/) (make sure `cargo` is in `PATH`, e.g. by following *rustup* instructions)
-2. `cargo build --release`
-
-## Configuring
-
-In `src/swarm.rs` replace `SERVER_PATH` to point to the storage server executable on your machine. Yes, this is not super user-friendly (yet) (TODO).
+2. `cargo build --release <binary-path>`, where `binary-path` is the path to the Storage Serger binary.
 
 ## Selecting a test
 

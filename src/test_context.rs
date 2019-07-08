@@ -7,11 +7,9 @@ use std::fmt::{self, Debug, Display};
 use std::sync::{Arc, Mutex};
 use std::io::prelude::*;
 
-use crate::swarms::PubKey;
-use crate::swarms::ServiceNode;
-use crate::swarms::SpawnStrategy;
-
 use crate::client::MessageResponse;
+
+use crate::swarms::{Swarm, PubKey, ServiceNode, SpawnStrategy};
 
 use crate::client;
 
@@ -294,5 +292,9 @@ impl TestContext {
     // swarm changes
     pub fn inc_block_height(&mut self) {
         self.bc.lock().unwrap().inc_block_height();
+    }
+
+    pub fn get_swarms(&self) -> Vec<Swarm> {
+        self.bc.lock().unwrap().get_swarms()
     }
 }
