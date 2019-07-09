@@ -109,7 +109,7 @@ fn main() {
 
     // multiple servers to simulate block progatation
     let lokid_ports = [22129, 22139, 22149];
-    let update_period = [ Duration::from_millis(100), Duration::from_millis(200), Duration::from_millis(300) ];
+    let update_period = [ Duration::from_millis(100), Duration::from_millis(300), Duration::from_millis(500) ];
 
     assert_eq!(lokid_ports.len(), update_period.len());
 
@@ -148,6 +148,12 @@ fn main() {
         block_interval: std::time::Duration::from_secs(10),
         message_interval: std::time::Duration::from_millis(50),
     };
+
+
+    // Note: some (small) tests don't work anymore because
+    // the node thinks it is "inactive". Need to make sure
+    // smarm changes are relative to block hashes, that should
+    // take care of the problem.
 
 
     // tests::async_test(&ctx);

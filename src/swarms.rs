@@ -135,7 +135,7 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     server_process.arg("0.0.0.0");
     server_process.arg(sn.port.to_string());
     server_process.arg("--log-level");
-    // server_process.arg("trace");
+    // server_process.arg("debug");
     server_process.arg("info");
     server_process.arg("--lokid-key");
     server_process.arg("key.txt");

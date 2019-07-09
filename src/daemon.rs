@@ -48,10 +48,16 @@ impl BlockchainView {
                 let bc = bc.lock().unwrap();
                 let mut cache = cache_clone.lock().unwrap();
 
-                cache.swarms = bc.get_swarms();
-                cache.height = bc.get_height();
-                cache.block_hash = bc.get_block_hash().clone();
-                cache.target_height = bc.get_target_height();
+                let hash = bc.get_block_hash().clone();
+
+                if hash != cache.block_hash {
+
+                    cache.block_hash = hash;
+                    cache.swarms = bc.get_swarms();
+                    cache.height = bc.get_height();
+                    cache.target_height = bc.get_target_height();
+
+                }
 
                 drop(cache);
                 drop(bc);
