@@ -19,6 +19,7 @@ mod tests;
 
 use rand::prelude::*;
 use std::io::prelude::*;
+use std::time::Duration;
 use swarms::*;
 
 use service_node::ServiceNode;
@@ -106,17 +107,22 @@ fn main() {
     let blockchain = Blockchain::new(&bin_path);
     let blockchain = Arc::new(Mutex::new(blockchain));
 
-    let ctx = TestContext::new(Arc::clone(&blockchain));
+    // multiple servers to simulate block progatation
+    let lokid_ports = [22129, 22139, 22149];
+    let update_period = [ Duration::from_millis(100), Duration::from_millis(200), Duration::from_millis(300) ];
+
+    assert_eq!(lokid_ports.len(), update_period.len());
+
+    let ctx = TestContext::new(Arc::clone(&blockchain), &lokid_ports);
     let ctx = Arc::new(Mutex::new(ctx));
 
     // Create multiple views into the blockchain and create different
     // server instances for each of them
 
-    let view_1 = BlockchainView::new(&blockchain);
-    // start RPC server
-    let server_thread = rpc_server::start_http_server(view_1);
-
-
+    for (port, period) in lokid_ports.iter().zip(update_period.iter()) {
+        let view = BlockchainView::new(&blockchain, *period);
+        let _ = rpc_server::start_http_server(view, *port);
+    }
 
     let bc = Arc::clone(&blockchain);
 
@@ -195,7 +201,4 @@ fn main() {
     println!("waiting for service nodes to finish");
 
     gracefully_exit(&blockchain);
-
-    // Will never be reached, just in case
-    server_thread.join().unwrap();
 }

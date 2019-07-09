@@ -1,6 +1,5 @@
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use crate::rpc_server::{RPC_PORT};
 use crate::blockchain::{KeyPair};
 use std::fmt::{self, Debug};
 use crate::service_node::ServiceNode;
@@ -141,7 +140,7 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     server_process.arg("--lokid-key");
     server_process.arg("key.txt");
     server_process.arg("--lokid-rpc-port");
-    server_process.arg(&RPC_PORT.to_string());
+    server_process.arg(sn.lokid_port.to_string());
     server_process.arg("--data-dir");
     server_process.arg(".");
 
@@ -170,7 +169,7 @@ impl SwarmManager {
         }
     }
 
-    pub fn add_swarm<'a>(&mut self, nodes: &[(u16, KeyPair)]) {
+    pub fn add_swarm<'a>(&mut self, nodes: &[(u16, KeyPair)], lokid_ports: &[u16]) {
         let swarm_id = self.get_next_swarm_id();
 
         info!("using {} as swarm id", swarm_id);
@@ -178,7 +177,8 @@ impl SwarmManager {
         let nodes: Vec<ServiceNode> = nodes
             .iter()
             .map(|(port, keypair)| {
-                ServiceNode::new(port.to_string(), keypair.pubkey.clone(), keypair.seckey.clone() )
+                let lokid_port = lokid_ports.choose(&mut self.rng).unwrap();
+                ServiceNode::new(port.to_string(), keypair.pubkey.clone(), keypair.seckey.clone(), *lokid_port)
             })
             .collect();
 

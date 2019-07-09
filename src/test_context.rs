@@ -20,6 +20,7 @@ pub struct TestContext {
     latest_port: u16,
     bad_snodes: Vec<ServiceNode>,
     keypair_pool: Vec<KeyPair>,
+    lokid_ports: Vec<u16>,
     rng: StdRng,
 }
 
@@ -43,7 +44,7 @@ impl Debug for TestContext {
 }
 
 impl TestContext {
-    pub fn new(bc: Arc<Mutex<Blockchain>>) -> TestContext {
+    pub fn new(bc: Arc<Mutex<Blockchain>>, lokid_ports: &[u16]) -> TestContext {
 
         // read keys file
         let mut contents = String::new();
@@ -67,6 +68,7 @@ impl TestContext {
             latest_port: 5901,
             bad_snodes: vec![],
             keypair_pool,
+            lokid_ports: lokid_ports.to_owned(),
             rng: StdRng::seed_from_u64(0),
         }
     }
@@ -203,7 +205,9 @@ impl TestContext {
                 let port = i.to_string();
 
                 let keypair = self.pop_keypair();
-                let sn = ServiceNode::new(port, keypair.pubkey.clone(), keypair.seckey.clone());
+
+                let lokid_port = self.lokid_ports.choose(&mut self.rng).unwrap();
+                let sn = ServiceNode::new(port, keypair.pubkey.clone(), keypair.seckey.clone(), *lokid_port);
                 self.bc.lock().unwrap().swarm_manager.add_snode(&sn, spawn);
 
                 res = Some(sn);
@@ -286,7 +290,7 @@ impl TestContext {
         }
 
         let mut bc = self.bc.lock().unwrap();
-        bc.swarm_manager.add_swarm(&ports);
+        bc.swarm_manager.add_swarm(&ports, &self.lokid_ports);
     }
 
     // TODO: ensure that we call this atomically with corresponding

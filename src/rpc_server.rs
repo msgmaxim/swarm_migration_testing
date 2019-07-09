@@ -26,8 +26,6 @@ struct RpcResponse<Type> {
     result: Type,
 }
 
-pub static RPC_PORT: u16 = 22029;
-
 fn construct_swarm_json(bc_view: &BlockchainView) -> String {
     let mut sn_list = vec![];
 
@@ -114,7 +112,7 @@ fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> St
 }
 
 /// Starts a new thread
-pub fn start_http_server(bc_view: BlockchainView) -> std::thread::JoinHandle<()> {
+pub fn start_http_server(bc_view: BlockchainView, port : u16) -> std::thread::JoinHandle<()> {
 
     let thread = std::thread::spawn(move || {
         let server = simple_server::Server::new(move |req, mut res| {
@@ -135,7 +133,7 @@ pub fn start_http_server(bc_view: BlockchainView) -> std::thread::JoinHandle<()>
             Ok(final_res)
         });
 
-        let port = RPC_PORT.to_string();
+        let port = port.to_string();
 
         println!("starting RPC server on port {}...", &port);
 

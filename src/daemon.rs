@@ -34,7 +34,7 @@ impl Drop for BlockchainView {
 }
 
 impl BlockchainView {
-    pub fn new(bc: &Arc<Mutex<Blockchain>>) -> BlockchainView {
+    pub fn new(bc: &Arc<Mutex<Blockchain>>, update_period: std::time::Duration) -> BlockchainView {
         let cache = BlockchainData { swarms : vec![], height : 0, block_hash : String::new(), target_height: 0};
         let cache = Arc::new(Mutex::new(cache));
 
@@ -56,7 +56,7 @@ impl BlockchainView {
                 drop(cache);
                 drop(bc);
 
-                std::thread::sleep(std::time::Duration::from_millis(200));
+                std::thread::sleep(update_period);
             }
 
 
