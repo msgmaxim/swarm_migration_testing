@@ -13,13 +13,18 @@ mod client;
 mod rpc_server;
 mod swarms;
 mod test_context;
+mod service_node;
+mod daemon;
 mod tests;
 
 use rand::prelude::*;
 use std::io::prelude::*;
 use swarms::*;
 
+use service_node::ServiceNode;
+
 use blockchain::Blockchain;
+use daemon::BlockchainView;
 use std::sync::{Arc, Mutex};
 use test_context::TestContext;
 
@@ -104,8 +109,13 @@ fn main() {
     let ctx = TestContext::new(Arc::clone(&blockchain));
     let ctx = Arc::new(Mutex::new(ctx));
 
+    // Create multiple views into the blockchain and create different
+    // server instances for each of them
+
+    let view_1 = BlockchainView::new(&blockchain);
     // start RPC server
-    let server_thread = rpc_server::start_http_server(&blockchain);
+    let server_thread = rpc_server::start_http_server(view_1);
+
 
 
     let bc = Arc::clone(&blockchain);

@@ -9,7 +9,8 @@ use std::io::prelude::*;
 
 use crate::client::MessageResponse;
 
-use crate::swarms::{Swarm, PubKey, ServiceNode, SpawnStrategy};
+use crate::swarms::{Swarm, PubKey, SpawnStrategy};
+use crate::service_node::ServiceNode;
 
 use crate::client;
 

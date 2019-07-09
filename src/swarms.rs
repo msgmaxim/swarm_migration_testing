@@ -3,25 +3,9 @@ use rand::seq::SliceRandom;
 use crate::rpc_server::{RPC_PORT};
 use crate::blockchain::{KeyPair};
 use std::fmt::{self, Debug};
+use crate::service_node::ServiceNode;
 
 use byteorder::{BigEndian, WriteBytesExt};
-
-#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ServiceNode {
-    pub port: String,
-    pub pubkey: String,
-    pub seckey: String,
-}
-
-impl ServiceNode {
-    pub fn new(port: String, pubkey: String, seckey: String) -> ServiceNode {
-        ServiceNode {
-            port,
-            pubkey,
-            seckey,
-        }
-    }
-}
 
 #[derive(Serialize, Clone)]
 pub struct Swarm {

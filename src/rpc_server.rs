@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use crate::daemon::{BlockchainView, BlockchainViewable};
 
 use crate::blockchain::Blockchain;
 
@@ -27,9 +28,12 @@ struct RpcResponse<Type> {
 
 pub static RPC_PORT: u16 = 22029;
 
-fn construct_swarm_json(bc: &Blockchain) -> String {
+fn construct_swarm_json(bc_view: &BlockchainView) -> String {
     let mut sn_list = vec![];
-    for swarm in &bc.swarm_manager.swarms {
+
+    // bc_view needs get_swarms()
+
+    for swarm in &bc_view.get_swarms() {
         for sn in &swarm.nodes {
             let service_node_pubkey = sn.pubkey.clone();
             let secret_key = sn.seckey.clone();
@@ -50,9 +54,9 @@ fn construct_swarm_json(bc: &Blockchain) -> String {
     let response = RpcResponse::<SwarmResult> {
         result: SwarmResult {
             service_node_states,
-            height: bc.get_height(),
-            target_height: bc.get_target_height(),
-            block_hash: bc.get_block_hash().clone(),
+            height: bc_view.get_height(),
+            target_height: bc_view.get_target_height(),
+            block_hash: bc_view.get_block_hash().clone(),
             hardfork: 12,
         },
     };
@@ -83,7 +87,7 @@ fn construct_ping_json() -> String {
 
 }
 
-fn process_json_rpc(bc: &Blockchain, req_body: serde_json::Value) -> String {
+fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> String {
     let mut res = String::new();
 
     if let Some(Some(method)) = req_body.get("method").map(|v| v.as_str()) {
@@ -91,7 +95,7 @@ fn process_json_rpc(bc: &Blockchain, req_body: serde_json::Value) -> String {
 
         match method {
             "get_n_service_nodes" => {
-                res = construct_swarm_json(&bc);
+                res = construct_swarm_json(&bc_view);
             }
             "perform_blockchain_test" => {
                 res = construct_bc_test_json();
@@ -110,8 +114,7 @@ fn process_json_rpc(bc: &Blockchain, req_body: serde_json::Value) -> String {
 }
 
 /// Starts a new thread
-pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::JoinHandle<()> {
-    let bc = Arc::clone(&blockchain);
+pub fn start_http_server(bc_view: BlockchainView) -> std::thread::JoinHandle<()> {
 
     let thread = std::thread::spawn(move || {
         let server = simple_server::Server::new(move |req, mut res| {
@@ -121,7 +124,7 @@ pub fn start_http_server(blockchain: &Arc<Mutex<Blockchain>>) -> std::thread::Jo
 
             if req.uri() == "/json_rpc" {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&req_body) {
-                    res_body = process_json_rpc(&bc.lock().unwrap(), val);
+                    res_body = process_json_rpc(&bc_view, val);
                 } else {
                     warn!("invalid json: \n{:?}", &req_body);
                 }

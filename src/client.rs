@@ -1,4 +1,5 @@
-use crate::swarms::{PubKey, SwarmManager, ServiceNode};
+use crate::swarms::{PubKey, SwarmManager};
+use crate::service_node::ServiceNode;
 
 use rand::prelude::*;
 use std::io::prelude::*;
