@@ -13,6 +13,8 @@ pub trait BlockchainViewable {
 
     fn get_target_height(&self) -> u64;
 
+    fn get_hf(&self) -> u8;
+
 }
 
 struct BlockchainData {
@@ -88,6 +90,11 @@ impl BlockchainViewable for BlockchainView {
 
     fn get_target_height(&self) -> u64 {
         self.cache.lock().unwrap().target_height
+    }
+
+    fn get_hf(&self) -> u8 {
+        // if self.cache.lock().unwrap().height < 5 { 11 } else { 12 }
+        13
     }
 
 }

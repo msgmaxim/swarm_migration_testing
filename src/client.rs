@@ -155,7 +155,7 @@ pub fn send_message(port: &str, pk: &str, msg: &str) -> Result<(), ()> {
 
 pub fn request_all_messages(sn: &str) -> Vec<MessageResponseFull> {
 
-    let target = "/retrieve_all";
+    let target = "/retrieve_all/v1";
     let addr = "https://localhost:".to_owned() + &sn + target;
 
     let client = reqwest::Client::builder()

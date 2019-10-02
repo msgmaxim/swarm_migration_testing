@@ -42,7 +42,7 @@ fn print_sn_data(swarm: &Swarm) {
 }
 
 fn send_req_to_quit(sn: &ServiceNode) -> Result<(), ()> {
-    let target = "/quit";
+    let target = "/quit/v1";
 
     let addr = "https://localhost:".to_owned() + &sn.port + target;
 

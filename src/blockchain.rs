@@ -52,8 +52,9 @@ impl Debug for Blockchain {
 
 impl Blockchain {
     pub fn new(bin_path: &str) -> Blockchain {
-        // 0 is used to indicate that SN haven't synced yet
-        let height = 2;
+        // we use 20, so blockchain testing starts immediately
+        // (also, 0 is used to indicate that SN haven't synced yet)
+        let height = 20;
         let block_hash = gen_random_hash();
 
         let swarm_manager = SwarmManager::new(bin_path);
@@ -71,7 +72,7 @@ impl Blockchain {
         if self.sys_time.elapsed().unwrap() >= std::time::Duration::from_secs(0) {
             self.height
         } else {
-            0
+            20
         }
     }
 

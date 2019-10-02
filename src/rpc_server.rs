@@ -1,7 +1,4 @@
-use std::sync::{Arc, Mutex};
 use crate::daemon::{BlockchainView, BlockchainViewable};
-
-use crate::blockchain::Blockchain;
 
 #[derive(Serialize, Debug)]
 struct ServiceNodeState {
@@ -10,6 +7,7 @@ struct ServiceNodeState {
     public_ip: String,
     storage_port: u16,
     swarm_id: u64,
+    funded: bool
 }
 
 #[derive(Serialize, Debug)]
@@ -18,7 +16,7 @@ struct SwarmResult {
     height: u64,
     target_height: u64,
     block_hash: String,
-    hardfork: u8,
+    hardfork: u8
 }
 
 #[derive(Serialize, Debug)]
@@ -44,6 +42,7 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
                 public_ip,
                 storage_port,
                 swarm_id,
+                funded: true
             })
         }
     }
@@ -55,7 +54,7 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
             height: bc_view.get_height(),
             target_height: bc_view.get_target_height(),
             block_hash: bc_view.get_block_hash().clone(),
-            hardfork: 12,
+            hardfork: bc_view.get_hf()
         },
     };
 
@@ -85,6 +84,16 @@ fn construct_ping_json() -> String {
 
 }
 
+fn construct_report_json() -> String {
+    let res = serde_json::json!({
+        "result": {
+            "status": "OK"
+        }
+    });
+
+    res.to_string()
+}
+
 fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> String {
     let mut res = String::new();
 
@@ -100,6 +109,9 @@ fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> St
             }
             "storage_server_ping" => {
                 res = construct_ping_json();
+            }
+            "report_peer_storage_server_status" => {
+                res = construct_report_json();
             }
             _ => {
                 warn!("unknown method: <{}>", &method);
