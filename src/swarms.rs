@@ -119,18 +119,6 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
         std::fs::copy("shared_files/key.pem", path.join("key.pem")).expect("could not copy a file");
     }
 
-    {
-        let key_path = path.join("key.txt");
-        let mut file = std::fs::File::create(&key_path).expect("could not create key file");
-
-        let pk = PubKey::new(&sn.seckey).expect("could not create a pub key from string");
-
-        file.write_u64::<BigEndian>(pk.data[0]).expect("writing pk");
-        file.write_u64::<BigEndian>(pk.data[1]).expect("writing pk");
-        file.write_u64::<BigEndian>(pk.data[2]).expect("writing pk");
-        file.write_u64::<BigEndian>(pk.data[3]).expect("writing pk");
-
-    }
 
     server_process.arg("0.0.0.0");
     server_process.arg(sn.port.to_string());
@@ -138,7 +126,7 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     // server_process.arg("debug");
     server_process.arg("info");
     server_process.arg("--lokid-key");
-    server_process.arg("key.txt");
+    server_process.arg(&sn.seckey);
     server_process.arg("--lokid-rpc-port");
     server_process.arg(sn.lokid_port.to_string());
     server_process.arg("--data-dir");
