@@ -3,6 +3,8 @@ use crate::daemon::{BlockchainView, BlockchainViewable};
 #[derive(Serialize, Debug)]
 struct ServiceNodeState {
     service_node_pubkey: String,
+    pubkey_x25519: String, // hex
+    pubkey_ed25519: String, // hex
     secret_key: String,
     public_ip: String,
     storage_port: u16,
@@ -24,11 +26,15 @@ struct RpcResponse<Type> {
     result: Type,
 }
 
+#[derive(Deserialize, Debug)]
+struct GetNodesRequest {
+    params: bool,
+}
+
 fn construct_swarm_json(bc_view: &BlockchainView) -> String {
     let mut sn_list = vec![];
 
     // bc_view needs get_swarms()
-
     for swarm in &bc_view.get_swarms() {
         for sn in &swarm.nodes {
             let service_node_pubkey = sn.pubkey.clone();
@@ -36,8 +42,12 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
             let public_ip = String::from("localhost");
             let storage_port = sn.port.parse::<u16>().unwrap();
             let swarm_id = swarm.swarm_id;
+            let pubkey_x25519 = sn.pubkey_x25519.clone();
+            let pubkey_ed25519 = sn.ed_keys.pubkey.clone();
             sn_list.push(ServiceNodeState {
                 service_node_pubkey,
+                pubkey_x25519,
+                pubkey_ed25519,
                 secret_key,
                 public_ip,
                 storage_port,
@@ -102,7 +112,26 @@ fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> St
 
         match method {
             "get_n_service_nodes" => {
+
+                let mut real_messenger = false;
+
+                if let Some(params) = req_body.get("params") {
+
+                    if let Some(Some(active_only)) = params.get("active_only").map(|v| v.as_bool()) {
+                        if active_only {
+                        
+                            real_messenger = true;
+                            println!("GET_N_SERVICE_NODES params, {:?}", params);
+                        }
+                    }
+                }
+
                 res = construct_swarm_json(&bc_view);
+
+                if real_messenger {
+                    dbg!(&res);
+                }
+
             }
             "perform_blockchain_test" => {
                 res = construct_bc_test_json();
@@ -139,6 +168,8 @@ pub fn start_http_server(bc_view: BlockchainView, port : u16) -> std::thread::Jo
                     warn!("invalid json: \n{:?}", &req_body);
                 }
             }
+
+            res.header("Content-Type", "application/json");
 
             let final_res = res.body(res_body.as_bytes().to_vec()).unwrap();
 

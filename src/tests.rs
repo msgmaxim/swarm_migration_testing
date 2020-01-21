@@ -555,11 +555,45 @@ fn generate_blocks(
     }
 }
 
+
+#[allow(dead_code)]
+pub fn test_real_messenger(ctx: &Arc<Mutex<TestContext>>, opt: &TestOptions) {
+
+    let running_flag = Arc::new(AtomicBool::new(true));
+
+    let duration = opt.duration;
+    let running = running_flag.clone();
+    let timer_thread = std::thread::spawn(move || {
+        std::thread::sleep(duration);
+        running.store(false, Ordering::SeqCst);
+    });
+
+    ctx.lock().unwrap().add_swarm(1);
+
+    // for _ in 0..4 {
+    //     ctx.lock().unwrap().add_snode();
+    // }
+
+    for _ in 0.. {
+
+        std::thread::sleep(opt.block_interval);
+
+        ctx.lock().unwrap().inc_block_height();
+
+        if !running_flag.load(Ordering::SeqCst) {
+            break;
+        }
+    }
+
+    timer_thread.join().unwrap();
+}
+
 #[allow(dead_code)]
 pub fn test_persistent_blocks(ctx: &Arc<Mutex<TestContext>>, opt: &TestOptions) {
 
     let mut rng = StdRng::seed_from_u64(0);
 
+    // messenger keys
     let pks = gen_rand_pubkeys(100, &mut rng);
 
     let running_flag = Arc::new(AtomicBool::new(true));

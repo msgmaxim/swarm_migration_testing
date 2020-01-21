@@ -14,7 +14,20 @@ fn gen_random_hash() -> String {
     format!("{:016x}{:016x}{:016x}{:016x}", n1, n2, n3, n4)
 }
 
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyPair {
+    pub pubkey: String,
+    pub seckey: String,
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct X25519KeyPair {
+    pub pubkey: String,
+    pub seckey: String,
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ed25519KeyPair {
     pub pubkey: String,
     pub seckey: String,
 }

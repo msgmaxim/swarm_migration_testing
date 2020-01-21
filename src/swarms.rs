@@ -1,6 +1,6 @@
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use crate::blockchain::{KeyPair};
+use crate::blockchain::{KeyPair, X25519KeyPair, Ed25519KeyPair};
 use std::fmt::{self, Debug};
 use crate::service_node::ServiceNode;
 
@@ -108,8 +108,11 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
 
         let stdout_file = stderr_file.try_clone().unwrap();
 
-        server_process.stderr(std::process::Stdio::from(stderr_file));
-        server_process.stdout(std::process::Stdio::from(stdout_file));
+        // Print the output for the first node in the terminal
+        // if sn.port != "5903" {
+            server_process.stderr(std::process::Stdio::from(stderr_file));
+            server_process.stdout(std::process::Stdio::from(stdout_file));
+        // }
     }
 
     // Copy ssl certificate and keys
@@ -123,10 +126,15 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     server_process.arg("0.0.0.0");
     server_process.arg(sn.port.to_string());
     server_process.arg("--log-level");
-    // server_process.arg("debug");
-    server_process.arg("info");
+    // server_process.arg("trace");
+    server_process.arg("debug");
+    // server_process.arg("info");
     server_process.arg("--lokid-key");
     server_process.arg(&sn.seckey);
+    server_process.arg("--lokid-x25519-key");
+    server_process.arg(&sn.seckey_x25519);
+    server_process.arg("--lokid-ed25519-key");
+    server_process.arg(&sn.ed_keys.seckey);
     server_process.arg("--lokid-rpc-port");
     server_process.arg(sn.lokid_port.to_string());
     server_process.arg("--data-dir");
@@ -157,22 +165,24 @@ impl SwarmManager {
         }
     }
 
-    pub fn add_swarm<'a>(&mut self, nodes: &[(u16, KeyPair)], lokid_ports: &[u16]) {
+    pub fn add_swarm<'a>(&mut self, nodes: Vec<(u16, KeyPair, Ed25519KeyPair, X25519KeyPair)>, lokid_ports: &[u16]) {
         let swarm_id = self.get_next_swarm_id();
 
         info!("using {} as swarm id", swarm_id);
 
         let nodes: Vec<ServiceNode> = nodes
-            .iter()
-            .map(|(port, keypair)| {
+            .into_iter()
+            .map(|(port, keypair, ed_keys, x_keys)| {
                 let lokid_port = lokid_ports.choose(&mut self.rng).unwrap();
-                ServiceNode::new(port.to_string(), keypair.pubkey.clone(), keypair.seckey.clone(), *lokid_port)
+
+                ServiceNode::new(port.to_string(), keypair, ed_keys, x_keys, *lokid_port)
             })
             .collect();
 
         for node in &nodes {
             if let Some(child) = spawn_service_node(&node, &self.exe_path) {
-                info!("NEW SNODE: {}", &node.port);
+                info!("NEW SNODE: {}, pid: {}", &node.port, child.id());
+                println!("NEW SNODE: {}, pid: {}", &node.port, child.id());
                 self.sn_to_child.insert(node.clone(), child);
             } else {
                 error!("Could not spawn node!");

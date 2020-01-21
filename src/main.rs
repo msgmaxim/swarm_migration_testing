@@ -139,10 +139,17 @@ fn main() {
         reliable_snodes: true,
         duration: std::time::Duration::from_secs(20),
         block_interval: std::time::Duration::from_secs(2),
-        message_interval: std::time::Duration::from_millis(50),
+        message_interval: std::time::Duration::from_millis(200),
     };
 
     let _long_test_opt = tests::TestOptions {
+        reliable_snodes: true,
+        duration: from_mins(1),
+        block_interval: std::time::Duration::from_secs(10),
+        message_interval: std::time::Duration::from_millis(50),
+    };
+
+    let messenger_test_opt = tests::TestOptions {
         reliable_snodes: true,
         duration: from_mins(5),
         block_interval: std::time::Duration::from_secs(10),
@@ -154,7 +161,6 @@ fn main() {
     // the node thinks it is "inactive". Need to make sure
     // smarm changes are relative to block hashes, that should
     // take care of the problem.
-
 
     // tests::async_test(&ctx);
 
@@ -174,6 +180,8 @@ fn main() {
     // tests::test_retry_singles(&ctx);
     // tests::test_blocks(&ctx, &options);
     tests::test_persistent_blocks(&ctx, &options);
+
+    // tests::test_real_messenger(&ctx, &options);
 
 
     let stdin = std::io::stdin();

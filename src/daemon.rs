@@ -17,6 +17,7 @@ pub trait BlockchainViewable {
 
 }
 
+#[derive(Debug)]
 struct BlockchainData {
     swarms: Vec<Swarm>,
     height: u64,
@@ -24,6 +25,7 @@ struct BlockchainData {
     target_height: u64,
 }
 
+#[derive(Debug)]
 pub struct BlockchainView {
     cache : Arc<Mutex<BlockchainData>>,
 }

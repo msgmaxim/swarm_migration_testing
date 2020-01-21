@@ -1,16 +1,16 @@
-use crate::blockchain::{Blockchain, KeyPair};
+use crate::blockchain::{Blockchain, KeyPair, X25519KeyPair, Ed25519KeyPair};
 
 use rand::prelude::*;
 use std::collections::HashMap;
 
 use std::fmt::{self, Debug, Display};
-use std::sync::{Arc, Mutex};
 use std::io::prelude::*;
+use std::sync::{Arc, Mutex};
 
 use crate::client::MessageResponse;
 
-use crate::swarms::{Swarm, PubKey, SpawnStrategy};
 use crate::service_node::ServiceNode;
+use crate::swarms::{PubKey, SpawnStrategy, Swarm};
 
 use crate::client;
 
@@ -19,7 +19,7 @@ pub struct TestContext {
     messages: HashMap<String, Vec<String>>,
     latest_port: u16,
     bad_snodes: Vec<ServiceNode>,
-    keypair_pool: Vec<KeyPair>,
+    keypair_pool: Vec<(KeyPair, Ed25519KeyPair, X25519KeyPair)>,
     lokid_ports: Vec<u16>,
     rng: StdRng,
 }
@@ -44,23 +44,44 @@ impl Debug for TestContext {
 }
 
 impl TestContext {
-    pub fn new(bc: Arc<Mutex<Blockchain>>, lokid_ports: &[u16]) -> TestContext {
-
-        // read keys file
+    fn read_keys() -> Vec<(KeyPair, Ed25519KeyPair, X25519KeyPair)> {
         let mut contents = String::new();
+        // each row in keys.txt is: legacy sk | legacy pk | ed pk | curve sc | curve pk
         let mut key_file = std::fs::File::open("keys.txt").expect("could not open key file");
         key_file.read_to_string(&mut contents).unwrap();
-        println!("total keys: {}", contents.lines().count());
-        let keypair_pool: Vec<KeyPair> = contents
+
+        let keypair_pool: Vec<(KeyPair, Ed25519KeyPair, X25519KeyPair)> = contents
             .lines()
             .map(|pair| {
-                let mut pair = pair.split_whitespace();
-                KeyPair {
-                    seckey: pair.next().unwrap().to_owned(),
-                    pubkey: pair.next().unwrap().to_owned(),
-                }
+                let mut keys = pair.split_whitespace();
+
+                let legacy = KeyPair {
+                    seckey: keys.next().unwrap().to_owned(),
+                    pubkey: keys.next().unwrap().to_owned(),
+                };
+
+                let ed_keys = Ed25519KeyPair {
+                    seckey: keys.next().unwrap().to_owned(),
+                    pubkey: keys.next().unwrap().to_owned(),
+                };
+
+                let x_keys = X25519KeyPair {
+                    seckey: keys.next().unwrap().to_owned(),
+                    pubkey: keys.next().unwrap().to_owned(),
+                };
+
+                (legacy, ed_keys, x_keys)
             })
             .collect();
+
+        keypair_pool
+    }
+
+    pub fn new(bc: Arc<Mutex<Blockchain>>, lokid_ports: &[u16]) -> TestContext {
+
+        let keypair_pool = TestContext::read_keys();
+
+        println!("total keys: {}", keypair_pool.len());
 
         TestContext {
             bc,
@@ -146,7 +167,10 @@ impl TestContext {
                 if self.bad_snodes.contains(&sn) {
                     continue;
                 };
-                info!("requesting messages from: {} [{}]", &swarm.swarm_id, &sn.port);
+                info!(
+                    "requesting messages from: {} [{}]",
+                    &swarm.swarm_id, &sn.port
+                );
 
                 let got_msgs = client::request_messages(&sn, key);
                 let got_msgs: Vec<String> = got_msgs.iter().map(|x| x.data.clone()).collect();
@@ -190,7 +214,7 @@ impl TestContext {
         );
     }
 
-    fn pop_keypair(&mut self) -> KeyPair {
+    fn pop_keypair(&mut self) -> (KeyPair, Ed25519KeyPair, X25519KeyPair) {
         self.keypair_pool.pop().expect("Could not pop a key pair")
     }
 
@@ -204,10 +228,18 @@ impl TestContext {
                 // let keypair = self.bc.lock().unwrap();
                 let port = i.to_string();
 
-                let keypair = self.pop_keypair();
+                let (legacy, ed_keys, x_keys) = self.pop_keypair();
 
                 let lokid_port = self.lokid_ports.choose(&mut self.rng).unwrap();
-                let sn = ServiceNode::new(port, keypair.pubkey.clone(), keypair.seckey.clone(), *lokid_port);
+
+                let sn = ServiceNode::new(
+                    port,
+                    legacy,
+                    ed_keys,
+                    x_keys,
+                    *lokid_port,
+                );
+
                 self.bc.lock().unwrap().swarm_manager.add_snode(&sn, spawn);
 
                 res = Some(sn);
@@ -234,7 +266,11 @@ impl TestContext {
 
         let _ = std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-            bc_copy.lock().unwrap().swarm_manager.restore_snode(&sn.expect("spawned node is none"));
+            bc_copy
+                .lock()
+                .unwrap()
+                .swarm_manager
+                .restore_snode(&sn.expect("spawned node is none"));
         });
     }
 
@@ -246,8 +282,12 @@ impl TestContext {
         self.bad_snodes.push(sn);
     }
 
-    pub fn dissolve_swarm(&mut self, swarm_idx : usize) {
-        self.bc.lock().unwrap().swarm_manager.dissolve_swarm(swarm_idx);
+    pub fn dissolve_swarm(&mut self, swarm_idx: usize) {
+        self.bc
+            .lock()
+            .unwrap()
+            .swarm_manager
+            .dissolve_swarm(swarm_idx);
     }
 
     pub fn restart_snode(&mut self, delay_ms: u64) {
@@ -274,15 +314,14 @@ impl TestContext {
     }
 
     pub fn add_swarm<'a>(&mut self, n: usize) {
-
-        let mut ports: Vec<(u16, KeyPair)> = vec![];
+        let mut node_data: Vec<(u16, KeyPair, Ed25519KeyPair, X25519KeyPair)> = vec![];
 
         for i in (self.latest_port + 1)..7000 {
             if is_port_available(i) {
+                let (legacy_keys, ed_keys, x_keys) = self.pop_keypair();
 
-                let keypair = self.pop_keypair();
-                ports.push((i, keypair));
-                if ports.len() >= n {
+                node_data.push((i, legacy_keys, ed_keys, x_keys));
+                if node_data.len() >= n {
                     self.latest_port = i;
                     break;
                 }
@@ -290,7 +329,7 @@ impl TestContext {
         }
 
         let mut bc = self.bc.lock().unwrap();
-        bc.swarm_manager.add_swarm(&ports, &self.lokid_ports);
+        bc.swarm_manager.add_swarm(node_data, &self.lokid_ports);
     }
 
     // TODO: ensure that we call this atomically with corresponding
