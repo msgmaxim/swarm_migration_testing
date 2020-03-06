@@ -83,6 +83,32 @@ impl TestContext {
 
         println!("total keys: {}", keypair_pool.len());
 
+        // TODO: poll earch SN every 200ms or so to see if they are alive
+        // NOTE: THIS IS MISLEADING! The nodes will often be reported as dead
+        // because they haven't had a chance to start their servers yet.
+        let bc_clone = bc.clone();
+        std::thread::spawn(move || {
+
+            loop {
+
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+
+                let bc = bc_clone.lock().unwrap();
+                
+                let swarms = bc.get_swarms();
+                for s in swarms {
+                    for node in s.nodes {
+
+                        if client::check_status(&node).is_err() {
+                            eprintln!("[!] No response from node: {}", node.port);
+                        }
+                    }
+                }
+
+            }
+
+        });
+
         TestContext {
             bc,
             messages: HashMap::new(),

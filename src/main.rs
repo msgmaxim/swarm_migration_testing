@@ -121,7 +121,7 @@ fn main() {
 
     for (port, period) in lokid_ports.iter().zip(update_period.iter()) {
         let view = BlockchainView::new(&blockchain, *period);
-        let _ = rpc_server::start_http_server(view, *port);
+        let _ = rpc_server::start_http_server2(view, *port);
     }
 
     let bc = Arc::clone(&blockchain);
@@ -137,9 +137,9 @@ fn main() {
 
     let options = tests::TestOptions {
         reliable_snodes: true,
-        duration: std::time::Duration::from_secs(20),
+        duration: std::time::Duration::from_secs(10),
         block_interval: std::time::Duration::from_secs(2),
-        message_interval: std::time::Duration::from_millis(200),
+        message_interval: std::time::Duration::from_millis(500),
     };
 
     let _long_test_opt = tests::TestOptions {
@@ -179,9 +179,9 @@ fn main() {
     // tests::test_retry_batches(&ctx);
     // tests::test_retry_singles(&ctx);
     // tests::test_blocks(&ctx, &options);
-    tests::test_persistent_blocks(&ctx, &options);
+    // tests::test_persistent_blocks(&ctx, &options);
 
-    // tests::test_real_messenger(&ctx, &options);
+    tests::test_real_messenger(&ctx, &options);
 
 
     let stdin = std::io::stdin();

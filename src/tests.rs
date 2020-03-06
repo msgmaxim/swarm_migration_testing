@@ -1,4 +1,3 @@
-use crate::blockchain::Blockchain;
 use crate::swarms::PubKey;
 use crate::test_context::TestContext;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -568,11 +567,8 @@ pub fn test_real_messenger(ctx: &Arc<Mutex<TestContext>>, opt: &TestOptions) {
         running.store(false, Ordering::SeqCst);
     });
 
-    ctx.lock().unwrap().add_swarm(1);
-
-    // for _ in 0..4 {
-    //     ctx.lock().unwrap().add_snode();
-    // }
+    // Add a single swarm with 4 nodes
+    ctx.lock().unwrap().add_swarm(4);
 
     for _ in 0.. {
 
@@ -605,11 +601,7 @@ pub fn test_persistent_blocks(ctx: &Arc<Mutex<TestContext>>, opt: &TestOptions) 
         running.store(false, Ordering::SeqCst);
     });
 
-    ctx.lock().unwrap().add_swarm(3);
-
-    for _ in 0..10 {
-        ctx.lock().unwrap().add_snode();
-    }
+    ctx.lock().unwrap().add_swarm(2);
 
     let message_thread = generate_messages_thread(&ctx, &pks, opt.clone(), &rng, &running_flag);
 

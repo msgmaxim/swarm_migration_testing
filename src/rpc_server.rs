@@ -8,6 +8,7 @@ struct ServiceNodeState {
     secret_key: String,
     public_ip: String,
     storage_port: u16,
+    storage_lmq_port: u16,
     swarm_id: u64,
     funded: bool
 }
@@ -41,6 +42,8 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
             let secret_key = sn.seckey.clone();
             let public_ip = String::from("localhost");
             let storage_port = sn.port.parse::<u16>().unwrap();
+            // TODO: actually add this port to sn (and check that it is available)
+            let storage_lmq_port = sn.port.parse::<u16>().unwrap() + 200;
             let swarm_id = swarm.swarm_id;
             let pubkey_x25519 = sn.pubkey_x25519.clone();
             let pubkey_ed25519 = sn.ed_keys.pubkey.clone();
@@ -51,6 +54,7 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
                 secret_key,
                 public_ip,
                 storage_port,
+                storage_lmq_port,
                 swarm_id,
                 funded: true
             })
@@ -152,6 +156,49 @@ fn process_json_rpc(bc_view: &BlockchainView, req_body: serde_json::Value) -> St
 
 }
 
+use std::io::Read;
+
+pub fn start_http_server2(bc_view: BlockchainView, port: u16) -> std::thread::JoinHandle<()> {
+
+    let thread = std::thread::spawn(move || {
+        
+        rouille::start_server(format!("0.0.0.0:{}", port), move |request| {
+
+            let mut data = request.data().expect("data already retrieved?");
+
+            let mut buf = Vec::new();
+            match data.read_to_end(&mut buf) {
+                Ok(_) => (),
+                Err(_) => return rouille::Response::text("Failed to read body")
+            };
+
+            let req_body = String::from_utf8_lossy(&buf);
+
+            let mut res_body = String::new();
+
+            if request.url() == "/json_rpc" {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&req_body) {
+                    res_body = process_json_rpc(&bc_view, val);
+                } else {
+                    warn!("invalid json: \n{:?}", &req_body);
+                    println!("invalid json: \n{:?}", &req_body);
+                }
+            } else if request.url() == "/lsrpc" {
+                println!("got an lsrpc request");
+                res_body = "OK".to_owned();
+            }
+
+            rouille::Response::from_data("application/json", res_body.as_bytes())
+        });
+
+
+    });
+
+    thread
+
+}
+
+#[allow(dead_code)]
 /// Starts a new thread
 pub fn start_http_server(bc_view: BlockchainView, port : u16) -> std::thread::JoinHandle<()> {
 
@@ -166,6 +213,7 @@ pub fn start_http_server(bc_view: BlockchainView, port : u16) -> std::thread::Jo
                     res_body = process_json_rpc(&bc_view, val);
                 } else {
                     warn!("invalid json: \n{:?}", &req_body);
+                    println!("invalid json: \n{:?}", &req_body);
                 }
             }
 

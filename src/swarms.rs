@@ -137,6 +137,8 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     server_process.arg(&sn.ed_keys.seckey);
     server_process.arg("--lokid-rpc-port");
     server_process.arg(sn.lokid_port.to_string());
+    server_process.arg("--lmq-port");
+    server_process.arg((sn.port.parse::<u16>().unwrap() + 200).to_string());
     server_process.arg("--data-dir");
     server_process.arg(".");
 
