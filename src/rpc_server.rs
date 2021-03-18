@@ -5,6 +5,7 @@ struct ServiceNodeState {
     service_node_pubkey: String,
     pubkey_x25519: String, // hex
     pubkey_ed25519: String, // hex
+    operator_address: String,
     secret_key: String,
     public_ip: String,
     storage_port: u16,
@@ -41,6 +42,7 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
             let service_node_pubkey = sn.pubkey.clone();
             let secret_key = sn.seckey.clone();
             let public_ip = String::from("localhost");
+            let operator_address = String::from("test");
             let storage_port = sn.port.parse::<u16>().unwrap();
             // TODO: actually add this port to sn (and check that it is available)
             let storage_lmq_port = sn.port.parse::<u16>().unwrap() + 200;
@@ -55,6 +57,7 @@ fn construct_swarm_json(bc_view: &BlockchainView) -> String {
                 public_ip,
                 storage_port,
                 storage_lmq_port,
+                operator_address,
                 swarm_id,
                 funded: true
             })

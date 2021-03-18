@@ -96,7 +96,8 @@ impl BlockchainViewable for BlockchainView {
 
     fn get_hf(&self) -> u8 {
         // we start with height 20...
-        if self.cache.lock().unwrap().height < 23 { 14 } else { 15 }
+        15
+        // if self.cache.lock().unwrap().height < 23 { 14 } else { 15 }
     }
 
 }

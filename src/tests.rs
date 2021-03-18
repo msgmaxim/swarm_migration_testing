@@ -567,8 +567,10 @@ pub fn test_real_messenger(ctx: &Arc<Mutex<TestContext>>, opt: &TestOptions) {
         running.store(false, Ordering::SeqCst);
     });
 
-    // Add a single swarm with 4 nodes
-    ctx.lock().unwrap().add_swarm(4);
+    const NODE_COUNT : usize = 4;
+
+    // Add a single swarm with `NODE_COUNT` nodes
+    ctx.lock().unwrap().add_swarm(NODE_COUNT);
 
     for _ in 0.. {
 

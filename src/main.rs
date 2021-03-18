@@ -10,11 +10,11 @@ extern crate log4rs;
 
 mod blockchain;
 mod client;
+mod daemon;
 mod rpc_server;
+mod service_node;
 mod swarms;
 mod test_context;
-mod service_node;
-mod daemon;
 mod tests;
 
 use rand::prelude::*;
@@ -109,7 +109,11 @@ fn main() {
 
     // multiple servers to simulate block progatation
     let lokid_ports = [22129, 22139, 22149];
-    let update_period = [ Duration::from_millis(100), Duration::from_millis(300), Duration::from_millis(500) ];
+    let update_period = [
+        Duration::from_millis(100),
+        Duration::from_millis(300),
+        Duration::from_millis(500),
+    ];
 
     assert_eq!(lokid_ports.len(), update_period.len());
 
@@ -137,9 +141,9 @@ fn main() {
 
     let options = tests::TestOptions {
         reliable_snodes: true,
-        duration: std::time::Duration::from_secs(10),
+        duration: std::time::Duration::from_secs(40),
         block_interval: std::time::Duration::from_secs(2),
-        message_interval: std::time::Duration::from_millis(500),
+        message_interval: std::time::Duration::from_millis(200),
     };
 
     let _long_test_opt = tests::TestOptions {
@@ -155,7 +159,6 @@ fn main() {
         block_interval: std::time::Duration::from_secs(10),
         message_interval: std::time::Duration::from_millis(50),
     };
-
 
     // Note: some (small) tests don't work anymore because
     // the node thinks it is "inactive". Need to make sure
@@ -183,7 +186,6 @@ fn main() {
 
     tests::test_real_messenger(&ctx, &options);
 
-
     let stdin = std::io::stdin();
     let mut iterator = stdin.lock().lines();
 
@@ -197,7 +199,6 @@ fn main() {
         }
 
         if command == "test" {
-
             let swarms = ctx.lock().unwrap().get_swarms();
 
             for s in &swarms {
