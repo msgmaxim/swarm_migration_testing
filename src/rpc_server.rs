@@ -164,8 +164,12 @@ use std::io::Read;
 pub fn start_http_server2(bc_view: BlockchainView, port: u16) -> std::thread::JoinHandle<()> {
 
     let thread = std::thread::spawn(move || {
+
+        let addr = format!("0.0.0.0:{}", port);
+
+        info!("Running RPC Server on {}", addr);
         
-        rouille::start_server(format!("0.0.0.0:{}", port), move |request| {
+        rouille::start_server(addr, move |request| {
 
             let mut data = request.data().expect("data already retrieved?");
 

@@ -129,17 +129,17 @@ pub fn spawn_service_node(sn: &ServiceNode, exe_path: &str) -> Option<std::proce
     // server_process.arg("trace");
     server_process.arg("debug");
     // server_process.arg("info");
-    server_process.arg("--lokid-key");
+    server_process.arg("--oxend-key");
     server_process.arg(&sn.seckey);
-    server_process.arg("--lokid-x25519-key");
+    server_process.arg("--oxend-x25519-key");
     server_process.arg(&sn.seckey_x25519);
-    server_process.arg("--lokid-ed25519-key");
+    server_process.arg("--oxend-ed25519-key");
     server_process.arg(&sn.ed_keys.seckey);
     server_process.arg("--stats-access-key");
     // The key used by swarm-tests-rust
     server_process.arg("BB88471D65E2659B30C55A5321CEBB5AAB2B70A398645C26DCA2B2FCB43FC518");
     // server_process.arg("--stats-access-key");
-    server_process.arg("--lokid-rpc-port");
+    server_process.arg("--oxend-rpc-port");
     server_process.arg(sn.lokid_port.to_string());
     server_process.arg("--lmq-port");
     server_process.arg((sn.port.parse::<u16>().unwrap() + 200).to_string());
